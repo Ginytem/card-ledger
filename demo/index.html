@@ -418,8 +418,13 @@ input[type=number]{-moz-appearance:textfield}
     var pill=document.createElement('span');
     pill.textContent='演示';
     pill.style.cssText='font-size:10px;font-weight:800;color:#fff;background:linear-gradient(135deg,#10b981,#059669);border-radius:99px;padding:2px 8px;margin-left:8px;letter-spacing:0.5px';
+    var gh=document.createElement('a');
+    gh.href='https://github.com/Ginytem/card-ledger';
+    gh.target='_blank'; gh.rel='noopener';
+    gh.textContent='GitHub';
+    gh.style.cssText='font-size:10px;font-weight:800;color:#6366f1;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:99px;padding:2px 9px;margin-left:8px;text-decoration:none;letter-spacing:0.5px;vertical-align:middle';
     var title=document.querySelector('.header .title');
-    if(title) title.appendChild(pill);
+    if(title){ title.appendChild(pill); title.appendChild(gh); }
   });
 })();
 </script>
@@ -593,9 +598,9 @@ input[type=number]{-moz-appearance:textfield}
       <div class="section-title">部署与配置说明</div>
       <div class="form-card" style="font-size:12px;color:var(--txt);line-height:1.9">
         <div><b>1. 登录账号密码</b><br>
-        在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 中配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code> 和 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PASSWORD</code>，默认 admin / admin123，部署前务必修改。</div>
+        在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 中配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code> 和 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PASSWORD</code>，演示环境：免登录，数据仅存本浏览器；正式部署说明见 GitHub 仓库 README。</div>
         <div style="margin-top:8px"><b>2. 微信推送（PushPlus）</b><br>
-        到 pushplus.plus 注册，复制你的 token，填入 wrangler.toml 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_TOKEN</code>，然后重启服务。改完后点上方「发送测试提醒」验证，微信能收到消息即配置成功。</div>
+        演示环境：推送为本地模拟，无需配置，在线上 Secret 中配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_TOKEN</code>，然后重启服务。改完后点上方「发送测试提醒」验证，微信能收到消息即配置成功。</div>
         <div style="margin-top:8px"><b>3. 邮件提醒（可选）</b><br>
         将 wrangler.toml 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_API</code> 改为你使用的邮件/通知接口地址（支持 JSON：token, title, content），即走邮件通道。</div>
         <div style="margin-top:8px"><b>4. 每日自动提醒（上线后）</b><br>

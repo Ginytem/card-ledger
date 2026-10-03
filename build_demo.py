@@ -17,6 +17,11 @@ html = html.replace("\\\\d", "\\d")       # \\d  -> \d   （正则 \d{4}）
 html = html.replace("\\\\uFEFF", "\\uFEFF")  # 导出 CSV BOM
 html = html.replace("\\\\n", "\\n")       # \\n  -> \n   （CSV 行连接）
 
+# 演示站文案净化：设置页的部署配置说明替换为演示环境说明（演示站不暴露默认账号密码）
+html = html.replace('默认 admin / admin123，部署前务必修改', '演示环境：免登录，数据仅存本浏览器；正式部署说明见 GitHub 仓库 README')
+html = html.replace('到 pushplus.plus 注册，复制你的 token', '演示环境：推送为本地模拟，无需配置')
+html = html.replace('填入 wrangler.toml 的', '在线上 Secret 中配置')
+
 mock = r'''
 <script>
 /* ============ 卡账记演示模式 ============
@@ -191,8 +196,13 @@ mock = r'''
     var pill=document.createElement('span');
     pill.textContent='演示';
     pill.style.cssText='font-size:10px;font-weight:800;color:#fff;background:linear-gradient(135deg,#10b981,#059669);border-radius:99px;padding:2px 8px;margin-left:8px;letter-spacing:0.5px';
+    var gh=document.createElement('a');
+    gh.href='https://github.com/Ginytem/card-ledger';
+    gh.target='_blank'; gh.rel='noopener';
+    gh.textContent='GitHub';
+    gh.style.cssText='font-size:10px;font-weight:800;color:#6366f1;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.35);border-radius:99px;padding:2px 9px;margin-left:8px;text-decoration:none;letter-spacing:0.5px;vertical-align:middle';
     var title=document.querySelector('.header .title');
-    if(title) title.appendChild(pill);
+    if(title){ title.appendChild(pill); title.appendChild(gh); }
   });
 })();
 </script>
