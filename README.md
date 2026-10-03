@@ -39,7 +39,7 @@ npm run dev
 # 或直接双击 start-dev.bat
 ```
 
-访问 http://127.0.0.1:8787 ，默认账号 `admin` / `admin123`（本地开发配置）。
+访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节）。
 
 停止服务：双击 `stop-dev.bat`
 
