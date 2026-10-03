@@ -188,12 +188,16 @@ input[type=number]{-moz-appearance:textfield}
 .cl-cell .yellow{color:#fbbf24;font-weight:600}
 .cl-cell .green{color:#34d399;font-weight:600}
 .cl-col-lim,.cl-col-used,.cl-col-rate{display:none}
+.fee-wide{display:none}
+.fee-narrow{font-weight:600}
 /* PC 端列表展示更多列 */
 @media(min-width:900px){
   .cl-head{grid-template-columns:2.2fr .9fr 1.2fr 1fr 1fr 1.1fr 1.6fr}
   .cl-row{grid-template-columns:2.2fr .9fr 1.2fr 1fr 1fr 1.1fr 1.6fr}
   .cl-col-lim,.cl-col-used,.cl-col-rate{display:block}
   .cl-mini{display:none}
+  .fee-wide{display:block}
+  .fee-narrow{display:none}
 }
 .cl-rate-bar{height:5px;background:var(--bar-bg);border-radius:3px;overflow:hidden;margin-top:4px}
 .cl-rate-bar>div{height:100%;border-radius:3px}
@@ -855,7 +859,7 @@ function renderDash(){
     else {dueTxt='还款日 '+fmtY(payDate).slice(5);}
     const fiCls=fi.status==='waived'?'green':fi.status==='failed'?'red':fi.status==='near'?'yellow':'';
     const paid = c.paid_through && payDate.getTime() <= new Date(c.paid_through+'T00:00:00').getTime();
-    const feeCell=f? ('<span class="'+fiCls+'">'+condText(f.condition_type)+' · '+fi.label+'</span>') : '<span class="sub">未配置</span>';
+    const feeCell=f? ('<span class="fee-wide"><span class="fee-num">'+f.current_value+'/'+f.target_value+(f.condition_type==='amount'?' 元':'')+'</span><span class="sub '+fiCls+'">'+condText(f.condition_type)+' · '+fi.label+'</span></span><span class="fee-narrow '+fiCls+'">'+condText(f.condition_type)+' · '+fi.label+'</span>') : '<span class="sub">未配置</span>';
     return '<div class="cl-row" onclick="openDetail('+c.id+')">'+
       '<span class="cl-bank">'+esc(c.bank_name)+(c.card_type?' <span class="ct">'+esc(c.card_type)+' · 尾号'+esc(c.last_4_digits)+'</span>':'<span class="ct">尾号'+esc(c.last_4_digits)+'</span>')+'</span>'+
       '<span class="cl-cell">'+c.billing_day+' 日</span>'+
