@@ -183,6 +183,8 @@ input[type=number]{-moz-appearance:textfield}
 .cl-bank{font-weight:700;line-height:1.3}
 .cl-bank .ct{display:block;font-size:10.5px;font-weight:400;color:var(--sub);margin-top:1px}
 .cl-cell{line-height:1.35}
+.cl-cell .fee-num{display:block;white-space:nowrap;font-weight:700;color:var(--txt2);font-variant-numeric:tabular-nums}
+.cl-cell .fee-unit{font-style:normal;font-weight:400;font-size:10px;color:var(--sub);margin-left:2px}
 .cl-cell .sub{display:block;font-size:10px;color:var(--sub);margin-top:2px}
 .cl-cell .red{color:#f87171;font-weight:600}
 .cl-cell .yellow{color:#fbbf24;font-weight:600}
@@ -855,7 +857,7 @@ function renderDash(){
     else {dueTxt='还款日 '+fmtY(payDate).slice(5);}
     const fiCls=fi.status==='waived'?'green':fi.status==='failed'?'red':fi.status==='near'?'yellow':'';
     const paid = c.paid_through && payDate.getTime() <= new Date(c.paid_through+'T00:00:00').getTime();
-    const feeCell=f? ('<span>'+f.current_value+'/'+f.target_value+(f.condition_type==='amount'?' 元':'')+'<span class="sub '+fiCls+'">'+condText(f.condition_type)+' · '+fi.label+'</span></span>') : '<span class="sub">未配置</span>';
+    const feeCell=f? ('<span class="fee-num">'+f.current_value+'/'+f.target_value+(f.condition_type==='amount'?'<em class="fee-unit">元</em>':'')+'</span><span class="sub '+fiCls+'">'+condText(f.condition_type)+' · '+fi.label+'</span>') : '<span class="sub">未配置</span>';
     return '<div class="cl-row" onclick="openDetail('+c.id+')">'+
       '<span class="cl-bank">'+esc(c.bank_name)+(c.card_type?' <span class="ct">'+esc(c.card_type)+' · 尾号'+esc(c.last_4_digits)+'</span>':'<span class="ct">尾号'+esc(c.last_4_digits)+'</span>')+'</span>'+
       '<span class="cl-cell">'+c.billing_day+' 日</span>'+
