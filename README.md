@@ -2,7 +2,7 @@
 
 个人信用卡资产管理工具：管理多张信用卡的额度、账单、还款日和年费减免进度。单文件、零外部依赖、数据自持，部署到 Cloudflare Workers 即可全平台使用（Web / 手机 PWA）。
 
-在线体验：https://cards.ginytem.com
+在线体验：**https://ginytem.github.io/card-ledger/**（演示站 · 内置虚拟数据，免登录直接体验，数据仅存本浏览器）
 
 ## 功能特性
 
@@ -21,14 +21,6 @@
 - Cloudflare Workers（单文件 worker.js，前端 + API + 定时任务一体）
 - Cloudflare D1（SQLite）数据库
 - 零外部 CDN 依赖，前端资源全部内联
-
-## 演示站
-
-在线体验完整功能（内置虚拟数据，可随意增删改查，数据仅保存在访问者浏览器）：
-
-- **https://ginytem.github.io/card-ledger/**（GitHub Pages）
-- 免登录直接进入；所有操作均为本地模拟，不连接任何真实数据库
-- 源码：`demo/index.html`（由 `build_demo.py` 从 `worker.js` 提取前端生成）
 
 ## 快速开始（本地开发）
 
@@ -153,7 +145,7 @@ card-ledger/
 
 ### v1.0.0（第一版上线 · 2026-10-03）
 
-首个公开版本，已上线 **https://cards.ginytem.com**（Cloudflare Workers + D1 + 自定义域名），GitHub 开源仓库 [Ginytem/card-ledger](https://github.com/Ginytem/card-ledger)。
+首个公开版本，已上线 Cloudflare Workers + D1 生产环境，GitHub 开源仓库 [Ginytem/card-ledger](https://github.com/Ginytem/card-ledger)。
 
 - 卡片管理（14+ 字段）、账单与还款（标记已还 / 逾期）、额度管理（使用率三色规则）
 - 额度变更历史时间轴、年费减免规则与进度（三种条件、四种状态）
