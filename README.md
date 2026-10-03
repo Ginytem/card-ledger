@@ -1,0 +1,147 @@
+# 卡账记 CardLedger
+
+个人信用卡资产管理工具：管理多张信用卡的额度、账单、还款日和年费减免进度。单文件、零外部依赖、数据自持，部署到 Cloudflare Workers 即可全平台使用（Web / 手机 PWA）。
+
+在线体验：https://cards.ginytem.com
+
+## 功能特性
+
+- **卡片管理**：银行、卡种、尾号、状态（正常/已注销）、永久额度、临时额度及到期日、账单日、还款日、年费金额与年费周期、备注；支持新增 / 编辑 / 删除 / 详情
+- **账单与还款**：账单金额、最低还款、还款截止日、逾期标识、标记已还（列表单元格内一键标记，已还自动沉底）、按账单日/还款日自动推算
+- **额度管理**：永久 / 临时 / 可用额度，使用率进度条（<40% 绿 / 40–70% 黄 / >70% 红）
+- **额度变更历史**：每次修改额度自动生成记录（旧额度 → 新额度、类型、生效日期、原因），详情页时间轴展示
+- **年费减免进度**：刷次数 / 刷金额 / 积分兑换三种条件，目标值、当前进度、进度条与状态（进行中 / 接近达标 / 已减免 / 未达标），年费周期临近结束未达标自动提醒
+- **仪表盘**：总授信（同银行按最高额度合并，显示银行数与卡数）、已用、可用、未来 7 天待还；账单/还款日历（今日高亮、账单日绿、还款日红、同日双标注，支持「账单+还款 / 仅账单日 / 仅还款日」三种标注模式）；信用卡表格列表（支持搜索、四种排序：还款日 / 账单日 / 年费进度 / 默认，PC 端全宽 7 列）；近期提醒滚动区；年费概览
+- **提醒**：还款日提前 N 天（设置页可配）、年费周期结束前 60 天未达标提醒；PushPlus 微信推送（可换邮件接口）；同一提醒不重复发送；设置页提供「发送测试提醒」按钮验证通道
+- **数据安全**：JSON 全量导出 / 恢复导入 / CSV 卡片导出；CSV 批量导入卡片（提供中文表头模板，同银行+尾号自动去重）
+- **界面**：Apple Wallet 卡片视觉，深色 / 浅色双主题一键切换（记忆选择），移动端优先 + PC 端适配，PWA 可安装到桌面 / 主屏幕
+
+## 技术栈
+
+- Cloudflare Workers（单文件 worker.js，前端 + API + 定时任务一体）
+- Cloudflare D1（SQLite）数据库
+- 零外部 CDN 依赖，前端资源全部内联
+
+## 快速开始（本地开发）
+
+环境要求：Node.js 18+
+
+```bash
+# 1. 安装依赖
+cd card-ledger
+npm install
+
+# 2. 初始化本地数据库（D1 本地模拟）
+npx wrangler d1 execute card-ledger-db --local --file=./d1/init.sql
+
+# 3. 启动本地服务
+npm run dev
+# 或直接双击 start-dev.bat
+```
+
+访问 http://127.0.0.1:8787 ，默认账号 `admin` / `admin123`（本地开发配置）。
+
+停止服务：双击 `stop-dev.bat`
+
+## 部署上线（Cloudflare Workers）
+
+前置：Node.js 18+、Cloudflare 账号、域名（可选，推荐绑定自定义域名）。
+
+```bash
+# 1. 登录 Cloudflare（浏览器授权）
+wrangler login
+
+# 2. 创建 D1 数据库
+wrangler d1 create card-ledger-db
+# 把返回的 database_id 填入 wrangler.toml 的 [[d1_databases]] database_id
+
+# 3. 初始化数据库表结构（含示例数据，可手动删除）
+wrangler d1 execute card-ledger-db --remote --file=./d1/init.sql
+
+# 4. 设置敏感配置（推荐用 Secret，加密存储、不进仓库）
+wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）
+wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32
+wrangler secret put PUSHPLUS_TOKEN # PushPlus token（pushplus.plus 注册，不配置则微信提醒不可用）
+# 然后将 wrangler.toml [vars] 中对应的 PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN 三项删除，
+# 只保留 USERNAME 与 PUSHPLUS_API（非敏感项可留在 vars）
+
+# 5. 部署
+wrangler deploy
+```
+
+部署完成后：
+
+**6. 配置定时提醒（Cron）**
+控制台 → Workers → card-ledger → 触发器 → Cron 触发器 → 添加 `0 1 * * *`（UTC，即北京时间每天 09:00）。定时任务每天检查还款日与年费进度，推送提醒。
+
+**7. 绑定自定义域名**
+控制台 → Workers → card-ledger → 设置 → 域 → 添加自定义域 `cards.ginytem.com`。若域名尚未接入 Cloudflare，先在 Cloudflare 添加站点（将域名的 DNS 服务器改为 Cloudflare 提供的两个），再按提示添加 CNAME 记录指向 Worker。
+
+**8. 验证**
+- 访问域名，用设置的账号密码登录
+- 设置页 → 发送测试提醒，微信能收到消息即推送通道正常
+- 启用两步验证（可选，推荐）
+
+## 配置说明
+
+| 配置 | 说明 |
+|---|---|
+| USERNAME / PASSWORD | 管理员登录账号 / 密码。PASSWORD 推荐用 Secret 设置 |
+| TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置 |
+| PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），用 Secret 设置 |
+| PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
+
+安全机制：登录返回 HMAC-SHA256 签名 token（7 天过期），无固定密钥硬编码；同一 IP 连续 5 次密码错误锁定 15 分钟；所有数据接口均需登录鉴权；部署到 Cloudflare 后自动启用 HTTPS。
+
+## 两步验证（2FA，可选）
+
+设置页 → 两步验证：
+
+1. 点「生成密钥」，用 Google Authenticator / 1Password 等标准 TOTP 认证器添加
+2. 输入认证器显示的 6 位动态码完成启用
+3. 启用后登录需密码 + 动态码
+
+启用时生成 **10 个一次性恢复码**，请妥善保存（每个用后作废）。
+
+**应急关闭**（丢失认证器且恢复码用完时）：删除数据库中的 2FA 配置后重新登录即可。
+
+```sql
+DELETE FROM settings WHERE key IN ('totp_secret','totp_enabled','totp_recovery');
+```
+
+- 本地：sqlite 工具直连 `.wrangler/state` 下 D1 文件执行
+- 线上：Cloudflare 控制台 → D1 → card-ledger-db → 控制台执行；或 `wrangler d1 execute card-ledger-db --remote --command="..."`
+
+## 数据导入导出与备份
+
+- 设置页 → 备份与恢复：JSON 全量导出 / 导入恢复 / CSV 卡片导出
+- 设置页 → 批量导入：下载 CSV 模板（中文表头：银行,卡种,尾号,状态,永久额度,临时额度,临时额度到期日,账单日,还款方式,还款日/天数,年费金额,年费周期起始,年费周期结束,已用额度,备注），一次导入多张卡片
+  - 尾号若以 0 开头（如 0567），该列请设为文本格式或加 `'` 前缀，防止 Excel 吞掉前导 0
+  - 同银行 + 同尾号已存在的卡片自动跳过，不会重复导入
+
+## 目录结构
+
+```
+card-ledger/
+├── worker.js          # 单文件应用（前端 + API + 定时任务）
+├── wrangler.toml      # Cloudflare 配置（vars / D1）
+├── d1/init.sql        # 数据库初始化脚本
+├── templates/         # 批量导入模板（CSV + 导入说明）
+├── start-dev.bat      # Windows 本地启动脚本
+├── stop-dev.bat       # Windows 本地停止脚本
+└── package.json       # wrangler 依赖与脚本
+```
+
+## 发布记录
+
+### v1.0.0（第一版上线）
+
+首个公开版本，包含完整功能集：
+
+- 卡片管理（14+ 字段）、账单与还款（标记已还 / 逾期）、额度管理（使用率三色规则）
+- 额度变更历史时间轴、年费减免规则与进度（三种条件）
+- 仪表盘：KPI（总授信 / 已用 / 可用 / 未来 7 天待还 / 年费概览）、账单还款日历（三态标注）、信用卡表格列表（四种排序 + 搜索）、近期提醒
+- 提醒：还款提前 N 天、年费提前 60 天未达标，PushPlus 微信推送（免重复），设置页测试推送
+- 数据：JSON / CSV 导入导出、CSV 批量导入模板、同银行多卡额度合并统计
+- 安全：动态签名 token、登录限流、全接口鉴权、可选 2FA + 恢复码
+- 体验：深 / 浅双主题、PWA 可安装、移动端优先 + PC 全宽表格、品牌图标与 favicon

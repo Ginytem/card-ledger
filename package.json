@@ -1,0 +1,13 @@
+{
+  "name": "card-ledger",
+  "version": "0.1.0",
+  "private": true,
+  "description": "卡账记 CardLedger - 个人信用卡资产管理工具",
+  "scripts": {
+    "dev": "wrangler dev --local --test-scheduled",
+    "d1:init": "wrangler d1 execute credit-card-db --local --file=./d1/init.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

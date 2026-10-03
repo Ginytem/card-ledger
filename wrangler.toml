@@ -1,0 +1,21 @@
+name = "card-ledger"
+main = "worker.js"
+compatibility_date = "2025-09-01"
+
+# 卡账记 CardLedger 部署配置
+# 敏感配置（PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN）不放在本文件，
+# 通过 `wrangler secret put` 以加密 Secret 设置（不进仓库）。
+# 本地开发使用 .dev.vars（已 gitignore）。
+
+[vars]
+USERNAME = "admin"
+PUSHPLUS_API = "https://www.pushplus.plus/send"
+
+# 定时提醒：每天 UTC 01:00（北京时间 09:00）检查还款日与年费进度
+[triggers]
+crons = ["0 1 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "card-ledger-db"
+database_id = "2f6adeab-7c05-4f26-aea2-79774156c2fd"

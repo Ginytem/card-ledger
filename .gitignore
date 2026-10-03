@@ -1,0 +1,14 @@
+﻿# 依赖与本地状态
+node_modules/
+.wrangler/
+
+# 日志与临时文件
+*.log
+*.preview.png
+*.tmp
+
+# 系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+.dev.vars
