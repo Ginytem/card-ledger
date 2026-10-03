@@ -2,7 +2,7 @@
 
 个人信用卡资产管理工具：管理多张信用卡的额度、账单、还款日和年费减免进度。单文件、零外部依赖、数据自持，部署到 Cloudflare Workers 即可全平台使用（Web / 手机 PWA）。
 
-在线体验：**https://ginytem.github.io/card-ledger/**（演示站 · 内置虚拟数据，免登录直接体验，数据仅存本浏览器）
+在线体验：[https://ginytem.github.io/card-ledger/](https://ginytem.github.io/card-ledger/)（演示站 · 内置虚拟数据，免登录直接体验，数据仅存本浏览器）
 
 ## 功能特性
 
