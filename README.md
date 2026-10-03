@@ -22,6 +22,14 @@
 - Cloudflare D1（SQLite）数据库
 - 零外部 CDN 依赖，前端资源全部内联
 
+## 演示站
+
+在线体验完整功能（内置虚拟数据，可随意增删改查，数据仅保存在访问者浏览器）：
+
+- **https://ginytem.github.io/card-ledger/**（GitHub Pages）
+- 免登录直接进入；所有操作均为本地模拟，不连接任何真实数据库
+- 源码：`demo/index.html`（由 `build_demo.py` 从 `worker.js` 提取前端生成）
+
 ## 快速开始（本地开发）
 
 环境要求：Node.js 18+
@@ -72,10 +80,17 @@ wrangler deploy
 部署完成后：
 
 **6. 配置定时提醒（Cron）**
-控制台 → Workers → card-ledger → 触发器 → Cron 触发器 → 添加 `0 1 * * *`（UTC，即北京时间每天 09:00）。定时任务每天检查还款日与年费进度，推送提醒。
+在 `wrangler.toml` 中已内置：
+
+```toml
+[triggers]
+crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
+```
+
+执行 `wrangler deploy` 时会自动创建 Cron 触发器（部署日志会显示 `schedule: 0 1 * * *`）。如需修改，改 toml 后重新 deploy 即可；也可在控制台 Worker 详情 → Triggers 中调整。
 
 **7. 绑定自定义域名**
-控制台 → Workers → card-ledger → 设置 → 域 → 添加自定义域 `cards.ginytem.com`。若域名尚未接入 Cloudflare，先在 Cloudflare 添加站点（将域名的 DNS 服务器改为 Cloudflare 提供的两个），再按提示添加 CNAME 记录指向 Worker。
+控制台 → Workers & Pages → 找到 `card-ledger` → 打开 Worker 详情页（Overview 页面的 Worker URL 区下方）→ **Custom Domains and Routes** → **+ Add Domain** → 选择你的域名（如 `ginytem.com`）→ 输入子域名（如 `cards`）→ 保存。Cloudflare 会自动创建 DNS 记录并签发证书（约 1–3 分钟生效）。若域名尚未接入 Cloudflare，先在控制台添加站点（把域名 DNS 服务器改为 Cloudflare 提供的两个）。
 
 **8. 验证**
 - 访问域名，用设置的账号密码登录
@@ -124,8 +139,10 @@ DELETE FROM settings WHERE key IN ('totp_secret','totp_enabled','totp_recovery')
 ```
 card-ledger/
 ├── worker.js          # 单文件应用（前端 + API + 定时任务）
-├── wrangler.toml      # Cloudflare 配置（vars / D1）
+├── wrangler.toml      # Cloudflare 配置（vars / D1 / Cron）
 ├── d1/init.sql        # 数据库初始化脚本
+├── demo/index.html    # 演示站（GitHub Pages，内置虚拟数据）
+├── build_demo.py      # 演示站构建脚本（从 worker.js 提取前端）
 ├── templates/         # 批量导入模板（CSV + 导入说明）
 ├── start-dev.bat      # Windows 本地启动脚本
 ├── stop-dev.bat       # Windows 本地停止脚本
@@ -134,14 +151,15 @@ card-ledger/
 
 ## 发布记录
 
-### v1.0.0（第一版上线）
+### v1.0.0（第一版上线 · 2026-10-03）
 
-首个公开版本，包含完整功能集：
+首个公开版本，已上线 **https://cards.ginytem.com**（Cloudflare Workers + D1 + 自定义域名），GitHub 开源仓库 [Ginytem/card-ledger](https://github.com/Ginytem/card-ledger)。
 
 - 卡片管理（14+ 字段）、账单与还款（标记已还 / 逾期）、额度管理（使用率三色规则）
-- 额度变更历史时间轴、年费减免规则与进度（三种条件）
+- 额度变更历史时间轴、年费减免规则与进度（三种条件、四种状态）
 - 仪表盘：KPI（总授信 / 已用 / 可用 / 未来 7 天待还 / 年费概览）、账单还款日历（三态标注）、信用卡表格列表（四种排序 + 搜索）、近期提醒
 - 提醒：还款提前 N 天、年费提前 60 天未达标，PushPlus 微信推送（免重复），设置页测试推送
 - 数据：JSON / CSV 导入导出、CSV 批量导入模板、同银行多卡额度合并统计
 - 安全：动态签名 token、登录限流、全接口鉴权、可选 2FA + 恢复码
 - 体验：深 / 浅双主题、PWA 可安装、移动端优先 + PC 全宽表格、品牌图标与 favicon
+- 演示站：GitHub Pages 在线体验（内置虚拟数据，本地模拟）
