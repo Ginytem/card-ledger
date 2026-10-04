@@ -59,7 +59,7 @@ wrangler d1 create card-ledger-db
 wrangler d1 execute card-ledger-db --remote --file=./d1/init.sql
 
 # 4. 设置敏感配置（推荐用 Secret，加密存储、不进仓库）
-wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）；登录后可在设置页「账号安全」自助修改，无需再碰命令行
+wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）；登录后可在设置页「账号安全」自助修改用户名与密码，无需再碰命令行
 wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32
 wrangler secret put PUSHPLUS_TOKEN # 可选：PushPlus token（也可直接在设置页「提醒设置」填写保存，二选一即可；不配置则 PushPlus 微信提醒不可用，可改用 Bark）
 # 然后将 wrangler.toml [vars] 中对应的 PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN 三项删除，
@@ -95,7 +95,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 
 | 配置 | 说明 |
 |---|---|
-| USERNAME / PASSWORD | 管理员登录账号 / 密码。PASSWORD 推荐用 Secret 设置；登录后可在设置页「账号安全」自助修改 |
+| USERNAME / PASSWORD | 管理员登录账号 / 密码。均为初始值，登录后可在设置页「账号安全」自助修改用户名与密码；修改后旧账号（环境变量初始值）不再可用 |
 | TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置；同时用作密码哈希盐 |
 | PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），可选：设置页填写保存即可，也可用 Secret 配置 |
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |

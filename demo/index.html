@@ -599,7 +599,16 @@ input[type=number]{-moz-appearance:textfield}
       </div>
       <div class="form-card fold-body hidden">
         <div style="font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-          当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 登录密码在下方功能中修改（新密码至少 6 位，修改后下次登录生效）
+          当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 用户名与登录密码均可在此修改（新密码至少 6 位，修改后下次登录生效）
+        </div>
+        <button class="btn ghost block" id="un-toggle" style="margin-top:4px">修改用户名</button>
+        <div id="un-form" class="hidden" style="margin-top:12px">
+          <label class="f-label">当前密码</label>
+          <input class="f-input" id="un-old" type="password" autocomplete="current-password">
+          <label class="f-label" style="margin-top:12px">新用户名</label>
+          <input class="f-input" id="un-new" placeholder="登录时使用的用户名（≤32 字符）" autocomplete="off">
+          <button class="btn green block" id="un-change" style="margin-top:12px">确认修改用户名</button>
+          <div id="un-msg" style="font-size:11.5px;color:var(--sub);margin-top:8px;min-height:14px"></div>
         </div>
         <button class="btn ghost block" id="pw-toggle" style="margin-top:4px">修改登录密码</button>
         <div id="pw-form" class="hidden" style="margin-top:12px">
@@ -667,7 +676,7 @@ input[type=number]{-moz-appearance:textfield}
       </div>
       <div class="form-card fold-body hidden" style="font-size:12px;color:var(--txt);line-height:1.9">
         <div><b>1. 登录账号密码</b><br>
-        首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改密码，无需再碰命令行。</div>
+        首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改用户名与密码，无需再碰命令行。</div>
         <div style="margin-top:8px"><b>2. 推送渠道（三选一，启用 Bark 后提醒走 Bark，PushPlus 不再发送）</b><br>
         <b>PushPlus 微信</b>：到 pushplus.plus 注册，复制 token 在本页「提醒设置」填写保存即可；也可部署前用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PUSHPLUS_TOKEN</code> 配置（环境变量兜底）。<br>
         <b>Bark（iOS）</b>：iPhone 安装 Bark，复制设备 Key 填到本页「提醒设置」，启用 Bark 后提醒直接走 Bark（无需部署配置）。<br>
@@ -1508,6 +1517,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('set-pushplus').onclick=async()=>{ settings.enable_pushplus=(settings.enable_pushplus!=='0')?'0':'1'; settings.enable_bark='0'; renderSettings(); };
   $('set-bark').onclick=async()=>{ settings.enable_bark=settings.enable_bark==='1'?'0':'1'; if(settings.enable_bark==='1')settings.enable_pushplus='0'; renderSettings(); };
   $('set-email').onclick=async()=>{ settings.enable_email=settings.enable_email==='1'?'0':'1'; renderSettings(); };
+  $('un-toggle').onclick=()=>{
+    const f=$('un-form');
+    const opened=!f.classList.toggle('hidden');
+    $('un-toggle').textContent=opened?'收起':'修改用户名';
+    if(!opened){ $('un-old').value=''; $('un-new').value=''; $('un-msg').textContent=''; }
+  };
+  $('un-change').onclick=async()=>{
+    const msg=$('un-msg');
+    const oldP=$('un-old').value, nu=$('un-new').value.trim();
+    if(!oldP||!nu){ msg.textContent='请填写完整'; msg.style.color='var(--yellow)'; return; }
+    if(nu.length>32){ msg.textContent='用户名不超过 32 个字符'; msg.style.color='var(--yellow)'; return; }
+    msg.textContent='提交中…'; msg.style.color='var(--sub)';
+    const r=await api('/api/account','PUT',{old_password:oldP,new_username:nu});
+    if(r.success){
+      msg.textContent='✅ '+r.message; msg.style.color='var(--green)';
+      adminUsername=r.username||nu; sessionStorage.setItem('ccUser',adminUsername);
+      $('un-old').value=''; $('un-new').value='';
+      const fas=$('fold-sum-account'); if(fas) fas.textContent='账号 '+adminUsername;
+      const su=$('sec-user'); if(su) su.textContent=adminUsername;
+      updateAuth();
+    }
+    else { msg.textContent=r.message||'修改失败'; msg.style.color='var(--yellow)'; }
+  };
   $('pw-toggle').onclick=()=>{
     const f=$('pw-form');
     const opened=!f.classList.toggle('hidden');

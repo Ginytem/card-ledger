@@ -195,6 +195,10 @@ export default {
         if (!(await checkAuth(request, env))) return unauthorized();
         return changePassword(request, env);
       }
+      if (url.pathname === '/api/account' && request.method === 'PUT') {
+        if (!(await checkAuth(request, env))) return unauthorized();
+        return changeUsername(request, env);
+      }
 
       return new Response('Not Found', { status: 404 });
     } catch (e) {
@@ -258,6 +262,19 @@ async function changePassword(request, env) {
   const salt = env.TOKEN_SECRET || 'dev-insecure-secret';
   await setSetting(env, 'password_hash', await sha256Hex(String(body.new_password) + '|' + salt));
   return json({ success: true, message: '密码已修改，下次登录使用新密码' });
+}
+// 用户名来源：设置页修改后存 DB（username），未设置时回退 env.USERNAME
+async function currentUsername(env) {
+  return (await getSetting(env, 'username').catch(() => null)) || env.USERNAME;
+}
+async function changeUsername(request, env) {
+  const body = await readJSON(request);
+  if (!body || !body.old_password || !body.new_username) return json({ success: false, message: '请填写完整' }, 400);
+  if (!(await checkPassword(env, body.old_password))) return json({ success: false, message: '当前密码不正确' }, 401);
+  const nu = String(body.new_username).trim();
+  if (!nu || nu.length > 32) return json({ success: false, message: '用户名不能为空且不超过 32 个字符' }, 400);
+  await setSetting(env, 'username', nu);
+  return json({ success: true, message: '用户名已修改，下次登录使用新用户名', username: nu });
 }
 async function verifyToken(env, token) {
   if (!token) return null;
@@ -345,7 +362,7 @@ async function totpSetup(env) {
   const recovery = genRecoveryCodes();
   await setSetting(env, 'totp_pending_secret', secret);
   await setSetting(env, 'totp_pending_recovery', JSON.stringify(recovery));
-  const otpauth = 'otpauth://totp/CardLedger:' + encodeURIComponent(env.USERNAME || 'admin') + '?secret=' + secret + '&issuer=CardLedger';
+  const otpauth = 'otpauth://totp/CardLedger:' + encodeURIComponent(await currentUsername(env)) + '?secret=' + secret + '&issuer=CardLedger';
   return json({ success: true, secret, otpauth, recovery_codes: recovery });
 }
 
@@ -457,7 +474,8 @@ async function handleLogin(request, env) {
     const mins = Math.ceil((Number(att.locked_until) - now) / 60000);
     return json({ success: false, message: '尝试次数过多，请 ' + mins + ' 分钟后重试' }, 429);
   }
-  if (username === env.USERNAME && await checkPassword(env, password)) {
+  const adminUser = await currentUsername(env);
+  if (username === adminUser && await checkPassword(env, password)) {
     // 两步验证：已启用则要求验证码或恢复码
     const totpOn = await getTotpEnabled(env).catch(() => false);
     if (totpOn) {
@@ -478,8 +496,8 @@ async function handleLogin(request, env) {
       }
     }
     await env.DB.prepare('DELETE FROM login_attempts WHERE ip = ?').bind(ip).run().catch(() => {});
-    const token = await signToken(env, username);
-    return json({ success: true, token, username: env.USERNAME });
+    const token = await signToken(env, adminUser);
+    return json({ success: true, token, username: adminUser });
   }
   const count = (att ? Number(att.count) : 0) + 1;
   if (count >= 5) {
@@ -1661,7 +1679,16 @@ input[type=number]{-moz-appearance:textfield}
       </div>
       <div class="form-card fold-body hidden">
         <div style="font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-          当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 登录密码在下方功能中修改（新密码至少 6 位，修改后下次登录生效）
+          当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 用户名与登录密码均可在此修改（新密码至少 6 位，修改后下次登录生效）
+        </div>
+        <button class="btn ghost block" id="un-toggle" style="margin-top:4px">修改用户名</button>
+        <div id="un-form" class="hidden" style="margin-top:12px">
+          <label class="f-label">当前密码</label>
+          <input class="f-input" id="un-old" type="password" autocomplete="current-password">
+          <label class="f-label" style="margin-top:12px">新用户名</label>
+          <input class="f-input" id="un-new" placeholder="登录时使用的用户名（≤32 字符）" autocomplete="off">
+          <button class="btn green block" id="un-change" style="margin-top:12px">确认修改用户名</button>
+          <div id="un-msg" style="font-size:11.5px;color:var(--sub);margin-top:8px;min-height:14px"></div>
         </div>
         <button class="btn ghost block" id="pw-toggle" style="margin-top:4px">修改登录密码</button>
         <div id="pw-form" class="hidden" style="margin-top:12px">
@@ -1729,7 +1756,7 @@ input[type=number]{-moz-appearance:textfield}
       </div>
       <div class="form-card fold-body hidden" style="font-size:12px;color:var(--txt);line-height:1.9">
         <div><b>1. 登录账号密码</b><br>
-        首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改密码，无需再碰命令行。</div>
+        首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改用户名与密码，无需再碰命令行。</div>
         <div style="margin-top:8px"><b>2. 推送渠道（三选一，启用 Bark 后提醒走 Bark，PushPlus 不再发送）</b><br>
         <b>PushPlus 微信</b>：到 pushplus.plus 注册，复制 token 在本页「提醒设置」填写保存即可；也可部署前用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PUSHPLUS_TOKEN</code> 配置（环境变量兜底）。<br>
         <b>Bark（iOS）</b>：iPhone 安装 Bark，复制设备 Key 填到本页「提醒设置」，启用 Bark 后提醒直接走 Bark（无需部署配置）。<br>
@@ -2570,6 +2597,29 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('set-pushplus').onclick=async()=>{ settings.enable_pushplus=(settings.enable_pushplus!=='0')?'0':'1'; settings.enable_bark='0'; renderSettings(); };
   $('set-bark').onclick=async()=>{ settings.enable_bark=settings.enable_bark==='1'?'0':'1'; if(settings.enable_bark==='1')settings.enable_pushplus='0'; renderSettings(); };
   $('set-email').onclick=async()=>{ settings.enable_email=settings.enable_email==='1'?'0':'1'; renderSettings(); };
+  $('un-toggle').onclick=()=>{
+    const f=$('un-form');
+    const opened=!f.classList.toggle('hidden');
+    $('un-toggle').textContent=opened?'收起':'修改用户名';
+    if(!opened){ $('un-old').value=''; $('un-new').value=''; $('un-msg').textContent=''; }
+  };
+  $('un-change').onclick=async()=>{
+    const msg=$('un-msg');
+    const oldP=$('un-old').value, nu=$('un-new').value.trim();
+    if(!oldP||!nu){ msg.textContent='请填写完整'; msg.style.color='var(--yellow)'; return; }
+    if(nu.length>32){ msg.textContent='用户名不超过 32 个字符'; msg.style.color='var(--yellow)'; return; }
+    msg.textContent='提交中…'; msg.style.color='var(--sub)';
+    const r=await api('/api/account','PUT',{old_password:oldP,new_username:nu});
+    if(r.success){
+      msg.textContent='✅ '+r.message; msg.style.color='var(--green)';
+      adminUsername=r.username||nu; sessionStorage.setItem('ccUser',adminUsername);
+      $('un-old').value=''; $('un-new').value='';
+      const fas=$('fold-sum-account'); if(fas) fas.textContent='账号 '+adminUsername;
+      const su=$('sec-user'); if(su) su.textContent=adminUsername;
+      updateAuth();
+    }
+    else { msg.textContent=r.message||'修改失败'; msg.style.color='var(--yellow)'; }
+  };
   $('pw-toggle').onclick=()=>{
     const f=$('pw-form');
     const opened=!f.classList.toggle('hidden');
