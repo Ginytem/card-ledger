@@ -39,7 +39,7 @@ npm run dev
 # 或直接双击 start-dev.bat
 ```
 
-访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节；登录后也可在设置页「账号安全」自助修改密码）。
+访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节；登录后也可在设置页「账号安全」自助修改用户名与密码）。
 
 停止服务：双击 `stop-dev.bat`
 
@@ -58,12 +58,12 @@ wrangler d1 create card-ledger-db
 # 3. 初始化数据库表结构（含示例数据，可手动删除）
 wrangler d1 execute card-ledger-db --remote --file=./d1/init.sql
 
-# 4. 设置敏感配置（推荐用 Secret，加密存储、不进仓库）
-wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）；登录后可在设置页「账号安全」自助修改用户名与密码，无需再碰命令行
-wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32
+# 4. 设置必需敏感配置（推荐用 Secret，加密存储、不进仓库；其余账号 / 密码 / 推送等配置部署后登录设置页自助完成）
+wrangler secret put PASSWORD      # 你的登录密码（≥6 位，别用 admin123）；登录后可在设置页「账号安全」自助修改用户名与密码，无需再碰命令行
+wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32（token 签名密钥 + 密码盐，无法后台修改，必须部署前配置）
 wrangler secret put PUSHPLUS_TOKEN # 可选：PushPlus token（也可直接在设置页「提醒设置」填写保存，二选一即可；不配置则 PushPlus 微信提醒不可用，可改用 Bark）
 # 然后将 wrangler.toml [vars] 中对应的 PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN 三项删除，
-# 只保留 USERNAME 与 PUSHPLUS_API（非敏感项可留在 vars）
+# 只保留 USERNAME 与 PUSHPLUS_API（非敏感项可留在 vars；USERNAME 仅为初始账号，登录后可在设置页修改）
 
 # 5. 部署
 wrangler deploy
@@ -101,7 +101,9 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
 | bark_key（设置页） | Bark 设备 Key（iPhone 安装 Bark 后复制），在设置页「提醒设置」填写并保存，存于数据库，无需部署配置 |
 
-安全机制：登录返回 HMAC-SHA256 签名 token（7 天过期），无固定密钥硬编码；密码存数据库为 SHA-256 加盐哈希（不存明文），设置接口不下发任何密钥类字段；同一 IP 连续 5 次密码错误锁定 15 分钟；数据接口均需登录鉴权；部署到 Cloudflare 后自动启用 HTTPS。未登录可浏览仪表盘（不含明细数据），账单 / 设置 / 数据页需登录后访问。
+> 上表中仅 `TOKEN_SECRET` 与 `PUSHPLUS_API` 需部署前配置（无法在设置页修改）；`USERNAME`、`PASSWORD`、`PUSHPLUS_TOKEN`、`bark_key` 均可部署后登录设置页自助修改或填写。
+
+安全机制：登录返回 HMAC-SHA256 签名 token（7 天过期），无固定密钥硬编码；密码存数据库为 SHA-256 加盐哈希（不存明文）；设置接口不下发密码哈希与 2FA 密钥类字段（Bark / PushPlus 密钥仅登录后用于回填展示）；同一 IP 连续 5 次密码错误锁定 15 分钟；数据接口均需登录鉴权；部署到 Cloudflare 后自动启用 HTTPS。未登录可浏览仪表盘（不含明细数据），账单 / 设置 / 数据页需登录后访问。**部署后除初始密码与 TOKEN_SECRET 外，账号、密码、推送渠道等配置均可在设置页自助完成，无需再改配置文件。**
 
 ## 两步验证（2FA，可选）
 
