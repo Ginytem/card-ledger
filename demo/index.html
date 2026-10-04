@@ -759,11 +759,16 @@ async function api(path, method='GET', body){
   const opt={method,headers:{}};
   if(body!==undefined){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
   if(adminToken) opt.headers['Authorization']='Bearer '+adminToken;
-  const r=await fetch(path,opt);
-  const data=await r.json().catch(()=>({success:false,message:r.status===401?'请先登录':(r.status===500?'服务器错误，请重试':'响应异常')}));
-  // 401：未登录访问静默（仪表盘公开展示空数据）；已登录但 token 失效才弹登录窗
-  if(!data.success && data.message==='请先登录' && adminToken && typeof openLogin==='function') openLogin();
-  return data;
+  const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),15000);
+  try{
+    const r=await fetch(path,Object.assign({},opt,{signal:ctrl.signal}));
+    const data=await r.json().catch(()=>({success:false,message:r.status===401?'请先登录':(r.status===500?'服务器错误，请重试':'响应异常')}));
+    // 401：未登录访问静默（仪表盘公开展示空数据）；已登录但 token 失效才弹登录窗
+    if(!data.success && data.message==='请先登录' && adminToken && typeof openLogin==='function') openLogin();
+    return data;
+  }catch(e){
+    return {success:false,message:e.name==='AbortError'?'请求超时，请重试':'网络异常，请重试'};
+  }finally{ clearTimeout(timer); }
 }
 
 // ---------- Toast ----------

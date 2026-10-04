@@ -998,18 +998,23 @@ async function sendBark(env, title, body) {
   const key = await getSetting(env, 'bark_key', '').catch(() => '');
   if (!key) return { ok: false, message: '未配置 Bark 设备 Key（设置页填写后保存）' };
   const url = /^https?:\/\//i.test(key) ? key : ('https://api.day.app/' + key);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, body }),
+      signal: controller.signal,
     });
     const txt = await resp.text();
     let ok = false, message = txt;
     try { const j = JSON.parse(txt); ok = j.code === 200 || !!j.success || resp.status === 200; message = j.message || j.msg || txt; } catch (e) {}
     return { ok, message };
   } catch (e) {
-    return { ok: false, message: '请求失败：' + e.message };
+    return { ok: false, message: '请求失败：' + (e.name === 'AbortError' ? '推送接口无响应（已超时 8 秒）' : e.message) };
+  } finally {
+    clearTimeout(timer);
   }
 }
 async function testPush(env) {
@@ -1024,20 +1029,25 @@ async function testPush(env) {
     return { ok: false, message: '未配置有效的 PUSHPLUS_TOKEN（打开 E:\\card-ledger\\wrangler.toml 填入真实 token 后重启服务）' };
   }
   const pushplusApi = env.PUSHPLUS_API || 'https://www.pushplus.plus/send';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const resp = await fetch(pushplusApi, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         token, title: '卡账记 · 测试提醒', content: '这是一条测试消息，说明提醒通道已生效。', template: 'html'
-      })
+      }),
+      signal: controller.signal,
     });
     const txt = await resp.text();
     let ok = false, message = txt;
     try { const j = JSON.parse(txt); ok = j.code === 200; message = j.msg || j.message || txt; } catch (e) {}
     return { ok, message };
   } catch (e) {
-    return { ok: false, message: '请求失败：' + e.message };
+    return { ok: false, message: '请求失败：' + (e.name === 'AbortError' ? '推送接口无响应（已超时 8 秒）' : e.message) };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -1800,11 +1810,16 @@ async function api(path, method='GET', body){
   const opt={method,headers:{}};
   if(body!==undefined){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
   if(adminToken) opt.headers['Authorization']='Bearer '+adminToken;
-  const r=await fetch(path,opt);
-  const data=await r.json().catch(()=>({success:false,message:r.status===401?'请先登录':(r.status===500?'服务器错误，请重试':'响应异常')}));
-  // 401：未登录访问静默（仪表盘公开展示空数据）；已登录但 token 失效才弹登录窗
-  if(!data.success && data.message==='请先登录' && adminToken && typeof openLogin==='function') openLogin();
-  return data;
+  const ctrl=new AbortController(); const timer=setTimeout(()=>ctrl.abort(),15000);
+  try{
+    const r=await fetch(path,Object.assign({},opt,{signal:ctrl.signal}));
+    const data=await r.json().catch(()=>({success:false,message:r.status===401?'请先登录':(r.status===500?'服务器错误，请重试':'响应异常')}));
+    // 401：未登录访问静默（仪表盘公开展示空数据）；已登录但 token 失效才弹登录窗
+    if(!data.success && data.message==='请先登录' && adminToken && typeof openLogin==='function') openLogin();
+    return data;
+  }catch(e){
+    return {success:false,message:e.name==='AbortError'?'请求超时，请重试':'网络异常，请重试'};
+  }finally{ clearTimeout(timer); }
 }
 
 // ---------- Toast ----------
