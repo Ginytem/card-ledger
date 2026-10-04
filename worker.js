@@ -1007,9 +1007,11 @@ async function sendBark(env, title, body) {
       body: JSON.stringify({ title, body }),
       signal: controller.signal,
     });
+    // 推送已发出即算成功，不再等待响应正文（部分 Bark 网关连接不关闭会导致正文读取挂起）
+    if (resp.ok) return { ok: true, message: '已发送' };
     const txt = await resp.text();
     let ok = false, message = txt;
-    try { const j = JSON.parse(txt); ok = j.code === 200 || !!j.success || resp.status === 200; message = j.message || j.msg || txt; } catch (e) {}
+    try { const j = JSON.parse(txt); ok = j.code === 200 || !!j.success; message = j.message || j.msg || txt; } catch (e) {}
     return { ok, message };
   } catch (e) {
     return { ok: false, message: '请求失败：' + (e.name === 'AbortError' ? '推送接口无响应（已超时 8 秒）' : e.message) };
@@ -1040,6 +1042,7 @@ async function testPush(env) {
       }),
       signal: controller.signal,
     });
+    if (resp.ok) return { ok: true, message: '已发送' };
     const txt = await resp.text();
     let ok = false, message = txt;
     try { const j = JSON.parse(txt); ok = j.code === 200; message = j.msg || j.message || txt; } catch (e) {}
