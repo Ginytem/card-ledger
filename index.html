@@ -1453,7 +1453,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     const box=$('test-push-result');
     box.innerHTML='发送中…'; box.style.color='var(--sub)';
     const r=await api('/api/test-push','POST',{});
-    if(r.ok){ box.innerHTML='✅ 推送成功（'+escapeHtml(r.message||'')+'）'; box.style.color='var(--green)'; }
+    if(r.ok){ box.innerHTML='✅ 推送成功（'+esc(r.message||'')+'）'; box.style.color='var(--green)'; }
     else { box.innerHTML='❌ '+(r.message||'推送失败'); box.style.color='var(--yellow)'; }
   };
   // 两步验证
