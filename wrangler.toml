@@ -8,7 +8,7 @@ compatibility_date = "2025-09-01"
 # 本地开发使用 .dev.vars（已 gitignore）。
 
 [vars]
-USERNAME = "S"
+USERNAME = "admin"
 PUSHPLUS_API = "https://www.pushplus.plus/send"
 
 # 定时提醒：每天 UTC 01:00（北京时间 09:00）检查还款日与年费进度

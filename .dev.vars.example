@@ -2,11 +2,11 @@
 # 使用方法：复制本文件为 .dev.vars 后填写你自己的值
 #   Windows: copy .dev.vars.example .dev.vars
 #   macOS / Linux: cp .dev.vars.example .dev.vars
-# .dev.vars 已被 gitignore，不会进入仓库；以下仅为示例占位符，请勿直接使用
+# .dev.vars 已被 gitignore，不会进入仓库；模板默认账号 admin / admin 仅用于首次登录，登录后请在设置页「账号安全」修改
 
-# 本地开发登录账号（部署上线时由 wrangler.toml [vars] USERNAME 与 Secret PASSWORD 决定，这里仅本地生效）
-USERNAME = "S"
-PASSWORD = "change-me"
+# 本地开发登录账号（模板默认 admin / admin，仅用于本地调试；部署上线时由 wrangler.toml [vars] USERNAME 与 Secret PASSWORD 决定，这里仅本地生效）
+USERNAME = "admin"
+PASSWORD = "admin"
 
 # 登录 token 签名密钥 + 密码盐（本地开发随意，部署上线必须用 openssl rand -hex 32 生成随机串）
 TOKEN_SECRET = "openssl rand -hex 32 生成后粘贴"
