@@ -30,15 +30,20 @@
 cd card-ledger
 npm install
 
-# 2. 初始化本地数据库（D1 本地模拟）
+# 2. 创建本地开发配置（仓库已提供模板，复制后填写自己的账号密码）
+#    Windows: copy .dev.vars.example .dev.vars
+#    macOS / Linux: cp .dev.vars.example .dev.vars
+#    （.dev.vars 已 gitignore，不会进入仓库）
+
+# 3. 初始化本地数据库（D1 本地模拟）
 npx wrangler d1 execute card-ledger-db --local --file=./d1/init.sql
 
-# 3. 启动本地服务
+# 4. 启动本地服务
 npm run dev
 # 或直接双击 start-dev.bat
 ```
 
-访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节；登录后也可在设置页「账号安全」自助修改用户名与密码）。
+访问 http://127.0.0.1:8787 ，本地开发登录账号密码即 `.dev.vars` 中填写的 USERNAME / PASSWORD（模板默认 USERNAME=S）。**部署上线后登录账号为 wrangler.toml 中 USERNAME（默认 S）与部署时 `wrangler secret put PASSWORD` 设置的密码；登录后可在设置页「账号安全」自助修改用户名与密码。**
 
 停止服务：双击 `stop-dev.bat`
 
@@ -84,7 +89,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 控制台 → Workers & Pages → 找到 `card-ledger` → 打开 Worker 详情页（Overview 页面的 Worker URL 区下方）→ **Custom Domains and Routes** → **+ Add Domain** → 选择你的域名（如 `ginytem.com`）→ 输入子域名（如 `cards`）→ 保存。Cloudflare 会自动创建 DNS 记录并签发证书（约 1–3 分钟生效）。若域名尚未接入 Cloudflare，先在控制台添加站点（把域名 DNS 服务器改为 Cloudflare 提供的两个）。
 
 **8. 验证**
-- 访问域名，用设置的账号密码登录
+- 访问域名，用部署时设置的账号密码登录（账号 = wrangler.toml 的 USERNAME，默认 S；密码 = 第 4 步 wrangler secret put PASSWORD 设置的值）
 - 设置页 → 提醒设置 → 推送渠道 → 启用 PushPlus 或 Bark 并保存 → 发送测试提醒，能收到消息即推送通道正常
 - 启用两步验证（可选，推荐）
 
@@ -94,7 +99,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 
 | 配置 | 说明 |
 |---|---|
-| USERNAME / PASSWORD | 管理员登录账号 / 密码。均为初始值，登录后可在设置页「账号安全」自助修改用户名与密码；修改后旧账号（环境变量初始值）不再可用 |
+| USERNAME / PASSWORD | 管理员登录账号 / 密码。账号默认 S（wrangler.toml 中配置），密码部署时自行设置；均为初始值，登录后可在设置页「账号安全」自助修改用户名与密码；修改后旧账号（初始值）不再可用 |
 | TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置；同时用作密码哈希盐 |
 | PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），可选：设置页填写保存即可，也可用 Secret 配置 |
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
