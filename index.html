@@ -6,6 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#6366f1">
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='64' y2='64'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%238b5cf6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Crect x='10' y='22' width='44' height='26' rx='6' fill='%23fff'/%3E%3Crect x='10' y='28' width='44' height='7' fill='%23c7d2fe'/%3E%3Crect x='14' y='40' width='16' height='4' rx='2' fill='%23e0e7ff'/%3E%3Ccircle cx='46' cy='42' r='5' fill='%23f6d365'/%3E%3C/svg%3E">
 <title>卡账记</title>
@@ -34,11 +35,6 @@ body.light{
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent}
 #app{max-width:640px;margin:0 auto;padding:0 0 72px;position:relative}
 .hidden{display:none!important}
-#login-gate{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center}
-#login-gate.hidden{display:none}
-.gate-box{text-align:center;padding:40px;max-width:320px;width:100%}
-.gate-title{font-size:21px;font-weight:800;margin:14px 0 6px;letter-spacing:0.5px}
-.gate-sub{font-size:12.5px;color:var(--sub);margin-bottom:20px;line-height:1.7}
 .header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--header-bg);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .header .title{font-size:21px;font-weight:800;letter-spacing:1.5px;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .header .sub{font-size:11px;color:var(--sub);margin-top:2px}
@@ -142,7 +138,7 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 .bill-row .amt{font-weight:800}
 .bill-row .date{font-size:11px;color:var(--sub);margin-top:2px}
 /* 日历 */
-.cal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:0 16px 10px}
+.cal{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;margin:0 0 10px}
 .cal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .cal-title-wrap{text-align:center;cursor:pointer}
 .cal-mode{font-size:9.5px;color:var(--sub);margin-top:2px;letter-spacing:0.5px}
@@ -567,7 +563,7 @@ input[type=number]{-moz-appearance:textfield}
         </div>
         <div id="bark-config" class="hidden" style="margin-top:12px">
           <label class="f-label">Bark 设备 Key</label>
-          <input class="f-input" id="set-bark-key" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..."
+          <input class="f-input" id="set-bark-key" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..." >
           <div style="font-size:11px;color:var(--sub);margin-top:4px">也可填自建 Bark 服务器完整地址（http(s):// 开头）。启用 Bark 后提醒改走 Bark，PushPlus 不再发送。</div>
         </div>
         <div style="font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6">
@@ -584,16 +580,19 @@ input[type=number]{-moz-appearance:textfield}
       <div class="section-title">账号安全</div>
       <div class="form-card">
         <div style="font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
-          修改登录密码（当前账号：<span id="sec-user">-</span>）。新密码至少 6 位，修改后下次登录生效。
+          当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 登录密码在下方功能中修改（新密码至少 6 位，修改后下次登录生效）
         </div>
-        <label class="f-label">当前密码</label>
-        <input class="f-input" id="pw-old" type="password" autocomplete="current-password">
-        <label class="f-label" style="margin-top:12px">新密码</label>
-        <input class="f-input" id="pw-new" type="password" autocomplete="new-password">
-        <label class="f-label" style="margin-top:12px">确认新密码</label>
-        <input class="f-input" id="pw-new2" type="password" autocomplete="new-password">
-        <button class="btn green block" id="pw-change" style="margin-top:12px">修改密码</button>
-        <div id="pw-msg" style="font-size:11.5px;color:var(--sub);margin-top:8px;min-height:14px"></div>
+        <button class="btn ghost block" id="pw-toggle" style="margin-top:4px">修改登录密码</button>
+        <div id="pw-form" class="hidden" style="margin-top:12px">
+          <label class="f-label">当前密码</label>
+          <input class="f-input" id="pw-old" type="password" autocomplete="current-password">
+          <label class="f-label" style="margin-top:12px">新密码</label>
+          <input class="f-input" id="pw-new" type="password" autocomplete="new-password">
+          <label class="f-label" style="margin-top:12px">确认新密码</label>
+          <input class="f-input" id="pw-new2" type="password" autocomplete="new-password">
+          <button class="btn green block" id="pw-change" style="margin-top:12px">确认修改密码</button>
+          <div id="pw-msg" style="font-size:11.5px;color:var(--sub);margin-top:8px;min-height:14px"></div>
+        </div>
       </div>
     </div>
     <div class="section">
@@ -610,8 +609,10 @@ input[type=number]{-moz-appearance:textfield}
           </div>
           <div id="totp-secret-box" class="hidden" style="margin-bottom:10px">
             <div style="font-size:11px;color:var(--sub);margin-bottom:4px">密钥（Base32）：</div>
+            <div id="totp-qr" style="display:none;background:#fff;border-radius:12px;padding:10px;width:max-content;max-width:100%;margin-bottom:8px"></div>
             <div id="totp-secret" style="font-family:ui-monospace,monospace;font-size:13px;letter-spacing:1px;background:var(--bar-bg);border-radius:8px;padding:10px;word-break:break-all"></div>
-            <div style="font-size:11px;color:var(--sub);margin-top:6px">认证器添加方式：选择「手动输入」，账号名随意，密钥填上面的字符串（无空格）。</div>
+            <button class="btn ghost" id="totp-copy" style="margin-top:8px;font-size:12px;padding:6px 14px">复制密钥</button>
+            <div style="font-size:11px;color:var(--sub);margin-top:6px">认证器添加方式：桌面端可扫码，或选择「手动输入」，账号名随意，密钥填上面的字符串（无空格）。</div>
           </div>
           <div id="totp-recovery-box" class="hidden" style="margin-bottom:10px">
             <div style="font-size:11px;color:var(--sub);margin-bottom:4px">恢复码（请抄下保存，登录时可直接代替验证码）：</div>
@@ -760,7 +761,8 @@ async function api(path, method='GET', body){
   if(adminToken) opt.headers['Authorization']='Bearer '+adminToken;
   const r=await fetch(path,opt);
   const data=await r.json().catch(()=>({success:false,message:r.status===401?'请先登录':(r.status===500?'服务器错误，请重试':'响应异常')}));
-  if(!data.success && data.message==='请先登录' && typeof openLogin==='function') openLogin();
+  // 401：未登录访问静默（仪表盘公开展示空数据）；已登录但 token 失效才弹登录窗
+  if(!data.success && data.message==='请先登录' && adminToken && typeof openLogin==='function') openLogin();
   return data;
 }
 
@@ -793,6 +795,8 @@ function closeConfirm(){ confirmCb=null; $('confirm-root').className='hidden'; }
 // ---------- 页面切换 ----------
 const PAGES=['dash','bills','settings','data','detail'];
 function showPage(p){
+  // 未登录仅开放仪表盘；账单 / 设置 / 数据直接弹出登录
+  if(!adminToken && p!=='dash'){ openLogin(); return; }
   PAGES.forEach(x=>{ $('page-'+x).classList.toggle('hidden',x!==p); });
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.page===p));
   window.scrollTo(0,0);
@@ -1163,7 +1167,7 @@ async function doLogin(){
   const totpBox=$('lg-totp');
   if(totpBox&&!totpBox.classList.contains('hidden')&&totpBox.value) payload.totp=totpBox.value;
   const r=await api('/api/login','POST',payload);
-  if(r.success){ adminToken=r.token; adminUsername=r.username; sessionStorage.setItem('ccToken',r.token); sessionStorage.setItem('ccUser',r.username); toast('登录成功'); closeModal(); hideGate(); updateAuth(); loadAll(); }
+  if(r.success){ adminToken=r.token; adminUsername=r.username; sessionStorage.setItem('ccToken',r.token); sessionStorage.setItem('ccUser',r.username); toast('登录成功'); closeModal(); updateAuth(); loadAll(); }
   else if(r.need_totp){
     // 密码已通过，展示第二步
     const u=$('lg-user').value, p=$('lg-pass').value;
@@ -1182,9 +1186,7 @@ function updateAuth(){
   $('logout-btn').classList.toggle('hidden',!adminToken);
   $('hdr-sub').textContent=adminToken?('已登录 · '+esc(adminUsername||'')):'';
 }
-function showGate(){ var g=$('login-gate'); if(g) g.classList.remove('hidden'); }
-function hideGate(){ var g=$('login-gate'); if(g) g.classList.add('hidden'); }
-function doLogout(){ adminToken=null; adminUsername=null; sessionStorage.removeItem('ccToken'); sessionStorage.removeItem('ccUser'); toast('已退出'); updateAuth(); showGate(); }
+function doLogout(){ adminToken=null; adminUsername=null; sessionStorage.removeItem('ccToken'); sessionStorage.removeItem('ccUser'); toast('已退出'); updateAuth(); showPage('dash'); }
 
 // 卡片表单
 function openCardForm(id){
@@ -1425,6 +1427,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   $('set-pushplus').onclick=async()=>{ settings.enable_pushplus=(settings.enable_pushplus!=='0')?'0':'1'; settings.enable_bark='0'; renderSettings(); };
   $('set-bark').onclick=async()=>{ settings.enable_bark=settings.enable_bark==='1'?'0':'1'; if(settings.enable_bark==='1')settings.enable_pushplus='0'; renderSettings(); };
   $('set-email').onclick=async()=>{ settings.enable_email=settings.enable_email==='1'?'0':'1'; renderSettings(); };
+  $('pw-toggle').onclick=()=>{
+    const f=$('pw-form');
+    const opened=!f.classList.toggle('hidden');
+    $('pw-toggle').textContent=opened?'收起':'修改登录密码';
+    if(!opened){ $('pw-old').value=''; $('pw-new').value=''; $('pw-new2').value=''; $('pw-msg').textContent=''; }
+  };
   $('pw-change').onclick=async()=>{
     const msg=$('pw-msg');
     const oldP=$('pw-old').value, np=$('pw-new').value, np2=$('pw-new2').value;
@@ -1453,8 +1461,25 @@ document.addEventListener('DOMContentLoaded',()=>{
       $('totp-recovery').textContent=(r.recovery_codes||[]).join('&nbsp;&nbsp;&nbsp;&nbsp;');
       $('totp-verify-box').classList.remove('hidden');
       $('totp-gen').classList.add('hidden');
+      // 桌面端生成二维码（otpauth URI），移动端保留字符串
+      const uri='otpauth://totp/'+encodeURIComponent('卡账记')+':'+encodeURIComponent(adminUsername||'S')+'?secret='+encodeURIComponent(r.secret)+'&issuer='+encodeURIComponent('卡账记')+'&algorithm=SHA1&digits=6&period=30';
+      const qrBox=$('totp-qr');
+      if(window.matchMedia&&matchMedia('(min-width:768px)').matches){
+        qrBox.style.display='block';
+        $('totp-secret').style.display='none';
+        try{
+          if(typeof qrcode!=='undefined'){
+            const qr=qrcode(0,'M'); qr.addData(uri); qr.make();
+            qrBox.innerHTML=qr.createSvgTag({cellSize:5,margin:0});
+          } else { qrBox.innerHTML='<div style="font-size:11px;color:#dc2626">二维码库加载失败，请复制下方密钥手动输入</div>'; }
+        }catch(e){ qrBox.innerHTML='<div style="font-size:11px;color:#dc2626">二维码生成失败，请复制下方密钥手动输入</div>'; }
+      } else { qrBox.style.display='none'; $('totp-secret').style.display='block'; }
       toast('密钥已生成，请添加到认证器');
     } else toast(r.message||'生成失败',true);
+  };
+  $('totp-copy').onclick=async()=>{
+    try{ await navigator.clipboard.writeText($('totp-secret').textContent); toast('密钥已复制'); }
+    catch(e){ const t=document.createElement('textarea'); t.value=$('totp-secret').textContent; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); toast('密钥已复制'); }
   };
   $('totp-enable').onclick=async()=>{
     const code=$('totp-code').value.trim();
@@ -1516,16 +1541,8 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(e){ toast('文件解析失败',true); }
   };
   updateAuth();
-  if (adminToken) loadAll(); else showGate();
+  loadAll();
 });
 </script>
-<div id="login-gate" class="hidden">
-  <div class="gate-box">
-    <svg class="brand-ico" viewBox="0 0 24 24" style="width:56px;height:56px"><defs><linearGradient id="brandg2" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="4.5" width="20" height="15" rx="3.5" fill="url(#brandg2)"/><rect x="2" y="9" width="20" height="3" fill="rgba(255,255,255,0.35)"/><rect x="5.5" y="15.5" width="5" height="1.6" rx="0.8" fill="rgba(255,255,255,0.75)"/><circle cx="17.5" cy="16" r="2.4" fill="#f6d365"/></svg>
-    <div class="gate-title">卡账记 CardLedger</div>
-    <div class="gate-sub">登录后查看信用卡仪表盘、账单与年费管理</div>
-    <button class="btn primary" style="min-width:140px" onclick="openLogin()">登录</button>
-  </div>
-</div>
 </body>
 </html>
