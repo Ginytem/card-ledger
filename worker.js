@@ -191,6 +191,10 @@ export default {
         if (!(await checkAuth(request, env))) return unauthorized();
         return json(await testPush(env));
       }
+      if (url.pathname === '/api/password' && request.method === 'POST') {
+        if (!(await checkAuth(request, env))) return unauthorized();
+        return changePassword(request, env);
+      }
 
       return new Response('Not Found', { status: 404 });
     } catch (e) {
@@ -232,6 +236,28 @@ async function signToken(env, username) {
   const p = b64u(new TextEncoder().encode(payload));
   const sig = await hmacB64u(env, p);
   return p + '.' + sig;
+}
+async function sha256Hex(text) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(d)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+// 密码校验：设置页修改后存 DB（password_hash），未设置时回退 env.PASSWORD
+async function checkPassword(env, password) {
+  const h = await getSetting(env, 'password_hash').catch(() => null);
+  if (h) {
+    const salt = env.TOKEN_SECRET || 'dev-insecure-secret';
+    return await sha256Hex(String(password) + '|' + salt) === h;
+  }
+  return String(password) === env.PASSWORD;
+}
+async function changePassword(request, env) {
+  const body = await readJSON(request);
+  if (!body || !body.old_password || !body.new_password) return json({ success: false, message: '请填写完整' }, 400);
+  if (String(body.new_password).length < 6) return json({ success: false, message: '新密码至少 6 位' }, 400);
+  if (!(await checkPassword(env, body.old_password))) return json({ success: false, message: '当前密码不正确' }, 401);
+  const salt = env.TOKEN_SECRET || 'dev-insecure-secret';
+  await setSetting(env, 'password_hash', await sha256Hex(String(body.new_password) + '|' + salt));
+  return json({ success: true, message: '密码已修改，下次登录使用新密码' });
 }
 async function verifyToken(env, token) {
   if (!token) return null;
@@ -431,7 +457,7 @@ async function handleLogin(request, env) {
     const mins = Math.ceil((Number(att.locked_until) - now) / 60000);
     return json({ success: false, message: '尝试次数过多，请 ' + mins + ' 分钟后重试' }, 429);
   }
-  if (username === env.USERNAME && password === env.PASSWORD) {
+  if (username === env.USERNAME && await checkPassword(env, password)) {
     // 两步验证：已启用则要求验证码或恢复码
     const totpOn = await getTotpEnabled(env).catch(() => false);
     if (totpOn) {
@@ -756,10 +782,11 @@ async function deleteFeeRule(request, env, id) {
 }
 
 // ---------- 设置 ----------
+const SENSITIVE_SETTINGS = ['password_hash', 'totp_secret', 'totp_recovery', 'totp_pending_secret', 'totp_pending_recovery'];
 async function getSettings(env) {
   const { results } = await env.DB.prepare('SELECT * FROM settings').all();
   const s = {};
-  (results || []).forEach(r => { s[r.key] = r.value; });
+  (results || []).forEach(r => { if (!SENSITIVE_SETTINGS.includes(r.key)) s[r.key] = r.value; });
   return json({ success: true, settings: s });
 }
 
@@ -966,8 +993,32 @@ async function importCards(env, csvText) {
   return { inserted, skipped, errors };
 }
 
-// 测试提醒通道（PushPlus）：本地即可验证，不依赖定时任务
+// 测试提醒通道（本地即可验证，不依赖定时任务；按设置渠道路由：Bark → PushPlus）
+async function sendBark(env, title, body) {
+  const key = await getSetting(env, 'bark_key', '').catch(() => '');
+  if (!key) return { ok: false, message: '未配置 Bark 设备 Key（设置页填写后保存）' };
+  const url = /^https?:\/\//i.test(key) ? key : ('https://api.day.app/' + key);
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, body }),
+    });
+    const txt = await resp.text();
+    let ok = false, message = txt;
+    try { const j = JSON.parse(txt); ok = j.code === 200 || !!j.success || resp.status === 200; message = j.message || j.msg || txt; } catch (e) {}
+    return { ok, message };
+  } catch (e) {
+    return { ok: false, message: '请求失败：' + e.message };
+  }
+}
 async function testPush(env) {
+  const barkOn = await getSetting(env, 'enable_bark', '0').catch(() => '0') === '1';
+  if (barkOn) {
+    const r = await sendBark(env, '卡账记 · 测试提醒', '这是一条测试消息（Bark 通道），说明提醒已生效。');
+    if (r.ok) return { ok: true, message: 'Bark · ' + (r.message || '已发送') };
+    return r;
+  }
   const token = env.PUSHPLUS_TOKEN;
   if (!token || token === 'your-pushplus-token') {
     return { ok: false, message: '未配置有效的 PUSHPLUS_TOKEN（打开 E:\\card-ledger\\wrangler.toml 填入真实 token 后重启服务）' };
@@ -1073,9 +1124,10 @@ async function markSent(env, cardId, type, dateStr) {
 
 async function doScheduledPush(env) {
   try {
+    const barkOn = await getSetting(env, 'enable_bark', '0').catch(() => '0') === '1';
     const token = env.PUSHPLUS_TOKEN;
-    if (!token) {
-      console.log('[scheduled] PUSHPLUS_TOKEN not set, skip');
+    if (!barkOn && !token) {
+      console.log('[scheduled] 未启用任何推送渠道（Bark 未开且 PUSHPLUS_TOKEN 未配置），skip');
       return;
     }
     const pushplusApi = env.PUSHPLUS_API || 'https://www.pushplus.plus/send';
@@ -1124,6 +1176,7 @@ async function doScheduledPush(env) {
 
     const esc = escapeHtml;
     let html = '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;max-width:600px">';
+    let plainLines = [];
     if (paymentDue.length) {
       html += '<h2 style="font-size:16px;margin:0 0 8px">💳 信用卡还款提醒（剩余 ' + advanceDays + ' 天）</h2>';
       paymentDue.forEach(item => {
@@ -1132,6 +1185,7 @@ async function doScheduledPush(env) {
         const amount = num(c.used_amount);
         const amountText = amount > 0 ? '，已用约 ' + amount + ' 元' : '';
         html += '<p style="margin:6px 0;font-size:14px">· <b>' + esc(c.bank_name) + '</b>（尾号' + esc(c.last_4_digits) + '）：到期日 <span style="color:#e11d48;font-weight:bold">' + ds + '</span>' + amountText + '</p>';
+        plainLines.push('💳 ' + c.bank_name + '（尾号' + c.last_4_digits + '）：还款日 ' + ds + amountText);
       });
     }
     if (feeDue.length) {
@@ -1145,22 +1199,28 @@ async function doScheduledPush(env) {
           prog = '，减免进度 ' + pct + '%';
         }
         html += '<p style="margin:6px 0;font-size:14px">· <b>' + esc(c.bank_name) + '</b>（尾号' + esc(c.last_4_digits) + '）：年费周期至 <span style="color:#d97706;font-weight:bold">' + esc(c.annual_fee_end) + '</span> 结束' + prog + '</p>';
+        plainLines.push('📅 ' + c.bank_name + '（尾号' + c.last_4_digits + '）：年费周期至 ' + c.annual_fee_end + ' 结束' + prog);
       });
     }
     html += '</div>';
 
-    const resp = await fetch(pushplusApi, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token,
-        title: '卡账记提醒',
-        content: html,
-        template: 'html',
-      }),
-    });
-    const respText = await resp.text().catch(() => '');
-    console.log('[scheduled] push status=', resp.status, respText);
+    if (barkOn) {
+      const r = await sendBark(env, '卡账记提醒', plainLines.join('\n'));
+      console.log('[scheduled] bark status=', r.ok, r.message);
+    } else {
+      const resp = await fetch(pushplusApi, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token,
+          title: '卡账记提醒',
+          content: html,
+          template: 'html',
+        }),
+      });
+      const respText = await resp.text().catch(() => '');
+      console.log('[scheduled] push status=', resp.status, respText);
+    }
 
     paymentDue.forEach(item => markSent(env, item.card.id, 'payment', t));
     feeDue.forEach(item => markSent(env, item.card.id, 'fee_cycle', t));
@@ -1210,6 +1270,11 @@ body.light{
 body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;min-height:100vh;-webkit-tap-highlight-color:transparent}
 #app{max-width:640px;margin:0 auto;padding:0 0 72px;position:relative}
 .hidden{display:none!important}
+#login-gate{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+#login-gate.hidden{display:none}
+.gate-box{text-align:center;padding:40px;max-width:320px;width:100%}
+.gate-title{font-size:21px;font-weight:800;margin:14px 0 6px;letter-spacing:0.5px}
+.gate-sub{font-size:12.5px;color:var(--sub);margin-bottom:20px;line-height:1.7}
 .header{position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--header-bg);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
 .header .title{font-size:21px;font-weight:800;letter-spacing:1.5px;background:linear-gradient(135deg,#6366f1,#8b5cf6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .header .sub{font-size:11px;color:var(--sub);margin-top:2px}
@@ -1538,7 +1603,13 @@ input[type=number]{-moz-appearance:textfield}
         <label class="f-label" style="margin-top:14px">推送渠道</label>
         <div style="display:flex;gap:8px;margin-top:6px">
           <button class="btn ghost" id="set-pushplus" style="flex:1">PushPlus 微信</button>
+          <button class="btn ghost" id="set-bark" style="flex:1">Bark</button>
           <button class="btn ghost" id="set-email" style="flex:1">邮件提醒</button>
+        </div>
+        <div id="bark-config" class="hidden" style="margin-top:12px">
+          <label class="f-label">Bark 设备 Key</label>
+          <input class="f-input" id="set-bark-key" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..."
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">也可填自建 Bark 服务器完整地址（http(s):// 开头）。启用 Bark 后提醒改走 Bark，PushPlus 不再发送。</div>
         </div>
         <div style="font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6">
           邮件提醒通过将推送接口指向邮件通道实现（见 README 特殊步骤）。<br>
@@ -1548,6 +1619,22 @@ input[type=number]{-moz-appearance:textfield}
         <button class="btn ghost block" id="test-push" style="margin-top:12px">发送测试提醒</button>
         <div id="test-push-result" style="font-size:11.5px;color:var(--sub);margin-top:8px"></div>
         <button class="btn green block" id="set-save" style="margin-top:14px">保存设置</button>
+      </div>
+    </div>
+    <div class="section">
+      <div class="section-title">账号安全</div>
+      <div class="form-card">
+        <div style="font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
+          修改登录密码（当前账号：<span id="sec-user">-</span>）。新密码至少 6 位，修改后下次登录生效。
+        </div>
+        <label class="f-label">当前密码</label>
+        <input class="f-input" id="pw-old" type="password" autocomplete="current-password">
+        <label class="f-label" style="margin-top:12px">新密码</label>
+        <input class="f-input" id="pw-new" type="password" autocomplete="new-password">
+        <label class="f-label" style="margin-top:12px">确认新密码</label>
+        <input class="f-input" id="pw-new2" type="password" autocomplete="new-password">
+        <button class="btn green block" id="pw-change" style="margin-top:12px">修改密码</button>
+        <div id="pw-msg" style="font-size:11.5px;color:var(--sub);margin-top:8px;min-height:14px"></div>
       </div>
     </div>
     <div class="section">
@@ -1589,19 +1676,19 @@ input[type=number]{-moz-appearance:textfield}
         </div>
       </div>
     </div>
-    <div class="section">
+    <div class="section" id="deploy-info">
       <div class="section-title">部署与配置说明</div>
       <div class="form-card" style="font-size:12px;color:var(--txt);line-height:1.9">
         <div><b>1. 登录账号密码</b><br>
-        在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 中配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code> 和 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PASSWORD</code>，默认 admin / admin123，部署前务必修改。</div>
-        <div style="margin-top:8px"><b>2. 微信推送（PushPlus）</b><br>
-        到 pushplus.plus 注册，复制你的 token，填入 wrangler.toml 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_TOKEN</code>，然后重启服务。改完后点上方「发送测试提醒」验证，微信能收到消息即配置成功。</div>
-        <div style="margin-top:8px"><b>3. 邮件提醒（可选）</b><br>
-        将 wrangler.toml 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_API</code> 改为你使用的邮件/通知接口地址（支持 JSON：token, title, content），即走邮件通道。</div>
-        <div style="margin-top:8px"><b>4. 每日自动提醒（上线后）</b><br>
-        部署到 Cloudflare Workers 后，在 Worker 设置里添加 Cron 定时触发器（如 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">0 1 * * *</code>，北京时间每天 9 点）。还款提醒提前天数、年费提前 60 天提醒由定时任务每天检查，同一提醒不会重复发送。<br>
+        首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改密码，无需再碰命令行。</div>
+        <div style="margin-top:8px"><b>2. 推送渠道</b><br>
+        <b>PushPlus 微信</b>：到 pushplus.plus 注册，复制 token 填入 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_TOKEN</code> 后重启。<br>
+        <b>Bark（iOS）</b>：iPhone 安装 Bark，复制设备 Key 填到本页「提醒设置」，启用 Bark 后提醒直接走 Bark（无需部署配置）。<br>
+        <b>邮件</b>：将 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_API</code> 改为邮件/通知接口地址（支持 JSON：token, title, content）。</div>
+        <div style="margin-top:8px"><b>3. 每日自动提醒（上线后）</b><br>
+        <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 内置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">[triggers] crons = ["0 1 * * *"]</code>（北京时间每天 9 点），deploy 时自动创建。还款提醒提前天数、年费提前 60 天提醒每天检查，同一提醒不重复发送。<br>
         本地调试不跑定时任务，用上方「发送测试提醒」验证通道。</div>
-        <div style="margin-top:8px"><b>5. 数据备份</b><br>
+        <div style="margin-top:8px"><b>4. 数据备份</b><br>
         「数据」页可导出 JSON / CSV 备份，防止数据丢失。</div>
       </div>
     </div>
@@ -2069,12 +2156,18 @@ function renderBills(){
 // ---------- 设置页 ----------
 function renderSettings(){
   $('set-advance').value=settings.payment_advance_days||'1';
-  const p=settings.enable_pushplus!=='0', e=settings.enable_email==='1';
-  const pb=$('set-pushplus'), eb=$('set-email');
-  pb.style.background=p?'rgba(16,185,129,0.18)':'var(--card)';
-  pb.style.color=p?'#34d399':'var(--sub)';
+  const p=settings.enable_pushplus!=='0', b=settings.enable_bark==='1', e=settings.enable_email==='1';
+  const pb=$('set-pushplus'), bb=$('set-bark'), eb=$('set-email');
+  pb.style.background=p&&!b?'rgba(16,185,129,0.18)':'var(--card)';
+  pb.style.color=p&&!b?'#34d399':'var(--sub)';
+  bb.style.background=b?'rgba(16,185,129,0.18)':'var(--card)';
+  bb.style.color=b?'#34d399':'var(--sub)';
   eb.style.background=e?'rgba(16,185,129,0.18)':'var(--card)';
   eb.style.color=e?'#34d399':'var(--sub)';
+  const bk=$('bark-config');
+  if(bk) bk.classList.toggle('hidden',!b);
+  if($('set-bark-key')) $('set-bark-key').value=settings.bark_key||'';
+  if($('sec-user')) $('sec-user').textContent=adminUsername||'-';
   loadTotpState();
 }
 
@@ -2111,7 +2204,7 @@ async function doLogin(){
   const totpBox=$('lg-totp');
   if(totpBox&&!totpBox.classList.contains('hidden')&&totpBox.value) payload.totp=totpBox.value;
   const r=await api('/api/login','POST',payload);
-  if(r.success){ adminToken=r.token; adminUsername=r.username; sessionStorage.setItem('ccToken',r.token); sessionStorage.setItem('ccUser',r.username); toast('登录成功'); closeModal(); updateAuth(); loadAll(); }
+  if(r.success){ adminToken=r.token; adminUsername=r.username; sessionStorage.setItem('ccToken',r.token); sessionStorage.setItem('ccUser',r.username); toast('登录成功'); closeModal(); hideGate(); updateAuth(); loadAll(); }
   else if(r.need_totp){
     // 密码已通过，展示第二步
     const u=$('lg-user').value, p=$('lg-pass').value;
@@ -2130,7 +2223,9 @@ function updateAuth(){
   $('logout-btn').classList.toggle('hidden',!adminToken);
   $('hdr-sub').textContent=adminToken?('已登录 · '+esc(adminUsername||'')):'';
 }
-function doLogout(){ adminToken=null; adminUsername=null; sessionStorage.removeItem('ccToken'); sessionStorage.removeItem('ccUser'); toast('已退出'); updateAuth(); }
+function showGate(){ var g=$('login-gate'); if(g) g.classList.remove('hidden'); }
+function hideGate(){ var g=$('login-gate'); if(g) g.classList.add('hidden'); }
+function doLogout(){ adminToken=null; adminUsername=null; sessionStorage.removeItem('ccToken'); sessionStorage.removeItem('ccUser'); toast('已退出'); updateAuth(); showGate(); }
 
 // 卡片表单
 function openCardForm(id){
@@ -2304,6 +2399,10 @@ async function delCard(id){
 // ---------- 设置 ----------
 async function saveSettings(){
   const body={payment_advance_days:String(Number($('set-advance').value)||1)};
+  body.enable_pushplus=settings.enable_pushplus!=='0'?'1':'0';
+  body.enable_bark=settings.enable_bark==='1'?'1':'0';
+  body.enable_email=settings.enable_email==='1'?'1':'0';
+  body.bark_key=($('set-bark-key')?$('set-bark-key').value.trim():'');
   const r=await api('/api/settings','PUT',body);
   if(r.success){ toast('设置已保存'); await loadAll(); }
 }
@@ -2364,8 +2463,20 @@ document.addEventListener('DOMContentLoaded',()=>{
     b.classList.add('active'); billFilter=b.dataset.f; renderBills();
   });
   $('set-save').onclick=saveSettings;
-  $('set-pushplus').onclick=async()=>{ settings.enable_pushplus=(settings.enable_pushplus!=='0')?'0':'1'; renderSettings(); };
+  $('set-pushplus').onclick=async()=>{ settings.enable_pushplus=(settings.enable_pushplus!=='0')?'0':'1'; settings.enable_bark='0'; renderSettings(); };
+  $('set-bark').onclick=async()=>{ settings.enable_bark=settings.enable_bark==='1'?'0':'1'; if(settings.enable_bark==='1')settings.enable_pushplus='0'; renderSettings(); };
   $('set-email').onclick=async()=>{ settings.enable_email=settings.enable_email==='1'?'0':'1'; renderSettings(); };
+  $('pw-change').onclick=async()=>{
+    const msg=$('pw-msg');
+    const oldP=$('pw-old').value, np=$('pw-new').value, np2=$('pw-new2').value;
+    if(!oldP||!np){ msg.textContent='请填写完整'; msg.style.color='var(--yellow)'; return; }
+    if(np.length<6){ msg.textContent='新密码至少 6 位'; msg.style.color='var(--yellow)'; return; }
+    if(np!==np2){ msg.textContent='两次输入的新密码不一致'; msg.style.color='var(--yellow)'; return; }
+    msg.textContent='提交中…'; msg.style.color='var(--sub)';
+    const r=await api('/api/password','POST',{old_password:oldP,new_password:np});
+    if(r.success){ msg.textContent='✅ '+r.message; msg.style.color='var(--green)'; $('pw-old').value=''; $('pw-new').value=''; $('pw-new2').value=''; }
+    else { msg.textContent=r.message||'修改失败'; msg.style.color='var(--yellow)'; }
+  };
   $('test-push').onclick=async()=>{
     const box=$('test-push-result');
     box.innerHTML='发送中…'; box.style.color='var(--sub)';
@@ -2446,9 +2557,17 @@ document.addEventListener('DOMContentLoaded',()=>{
     }catch(e){ toast('文件解析失败',true); }
   };
   updateAuth();
-  loadAll();
+  if (adminToken) loadAll(); else showGate();
 });
 </script>
+<div id="login-gate" class="hidden">
+  <div class="gate-box">
+    <svg class="brand-ico" viewBox="0 0 24 24" style="width:56px;height:56px"><defs><linearGradient id="brandg2" x1="0" y1="0" x2="24" y2="24"><stop offset="0" stop-color="#6366f1"/><stop offset="1" stop-color="#8b5cf6"/></linearGradient></defs><rect x="2" y="4.5" width="20" height="15" rx="3.5" fill="url(#brandg2)"/><rect x="2" y="9" width="20" height="3" fill="rgba(255,255,255,0.35)"/><rect x="5.5" y="15.5" width="5" height="1.6" rx="0.8" fill="rgba(255,255,255,0.75)"/><circle cx="17.5" cy="16" r="2.4" fill="#f6d365"/></svg>
+    <div class="gate-title">卡账记 CardLedger</div>
+    <div class="gate-sub">登录后查看信用卡仪表盘、账单与年费管理</div>
+    <button class="btn primary" style="min-width:140px" onclick="openLogin()">登录</button>
+  </div>
+</div>
 </body>
 </html>
   `;

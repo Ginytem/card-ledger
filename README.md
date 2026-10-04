@@ -12,7 +12,7 @@
 - **额度变更历史**：每次修改额度自动生成记录（旧额度 → 新额度、类型、生效日期、原因），详情页时间轴展示
 - **年费减免进度**：刷次数 / 刷金额 / 积分兑换三种条件，目标值、当前进度、进度条与状态（进行中 / 接近达标 / 已减免 / 未达标），年费周期临近结束未达标自动提醒
 - **仪表盘**：总授信（同银行按最高额度合并，显示银行数与卡数）、已用、可用、未来 7 天待还；账单/还款日历（今日高亮、账单日绿、还款日红、同日双标注，支持「账单+还款 / 仅账单日 / 仅还款日」三种标注模式）；信用卡表格列表（支持搜索、四种排序：还款日 / 账单日 / 年费进度 / 默认，PC 端全宽 7 列）；近期提醒滚动区；年费概览
-- **提醒**：还款日提前 N 天（设置页可配）、年费周期结束前 60 天未达标提醒；PushPlus 微信推送（可换邮件接口）；同一提醒不重复发送；设置页提供「发送测试提醒」按钮验证通道
+- **提醒**：还款日提前 N 天（设置页可配）、年费周期结束前 60 天未达标提醒；PushPlus 微信推送 / Bark（iOS，设备 Key 直接填设置页即可）/ 可换邮件接口；同一提醒不重复发送；设置页提供「发送测试提醒」按钮验证通道
 - **数据安全**：JSON 全量导出 / 恢复导入 / CSV 卡片导出；CSV 批量导入卡片（提供中文表头模板，同银行+尾号自动去重）
 - **界面**：Apple Wallet 卡片视觉，深色 / 浅色双主题一键切换（记忆选择），移动端优先 + PC 端适配，PWA 可安装到桌面 / 主屏幕
 
@@ -39,7 +39,7 @@ npm run dev
 # 或直接双击 start-dev.bat
 ```
 
-访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节）。
+访问 http://127.0.0.1:8787 ，本地开发默认账号见 `.dev.vars`（该文件已 gitignore，不进仓库；部署上线前务必修改密码，见「部署上线」章节；登录后也可在设置页「账号安全」自助修改密码）。
 
 停止服务：双击 `stop-dev.bat`
 
@@ -59,9 +59,9 @@ wrangler d1 create card-ledger-db
 wrangler d1 execute card-ledger-db --remote --file=./d1/init.sql
 
 # 4. 设置敏感配置（推荐用 Secret，加密存储、不进仓库）
-wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）
+wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）；登录后可在设置页「账号安全」自助修改，无需再碰命令行
 wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32
-wrangler secret put PUSHPLUS_TOKEN # PushPlus token（pushplus.plus 注册，不配置则微信提醒不可用）
+wrangler secret put PUSHPLUS_TOKEN # PushPlus token（pushplus.plus 注册，不配置则 PushPlus 微信提醒不可用；也可改用 Bark，见下）
 # 然后将 wrangler.toml [vars] 中对应的 PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN 三项删除，
 # 只保留 USERNAME 与 PUSHPLUS_API（非敏感项可留在 vars）
 
@@ -86,19 +86,22 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 
 **8. 验证**
 - 访问域名，用设置的账号密码登录
-- 设置页 → 发送测试提醒，微信能收到消息即推送通道正常
+- 设置页 → 推送渠道 → 启用 PushPlus 或 Bark 并保存 → 发送测试提醒，能收到消息即推送通道正常
 - 启用两步验证（可选，推荐）
+
+> **推送渠道二选一**：启用 Bark 后提醒改走 Bark（设备 Key 填设置页即可，无需部署配置）；未启用 Bark 时走 PushPlus（需配置 PUSHPLUS_TOKEN）。
 
 ## 配置说明
 
 | 配置 | 说明 |
 |---|---|
-| USERNAME / PASSWORD | 管理员登录账号 / 密码。PASSWORD 推荐用 Secret 设置 |
-| TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置 |
+| USERNAME / PASSWORD | 管理员登录账号 / 密码。PASSWORD 推荐用 Secret 设置；登录后可在设置页「账号安全」自助修改 |
+| TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置；同时用作密码哈希盐 |
 | PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），用 Secret 设置 |
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
+| bark_key（设置页） | Bark 设备 Key（iPhone 安装 Bark 后复制），在设置页「提醒设置」填写并保存，存于数据库，无需部署配置 |
 
-安全机制：登录返回 HMAC-SHA256 签名 token（7 天过期），无固定密钥硬编码；同一 IP 连续 5 次密码错误锁定 15 分钟；所有数据接口均需登录鉴权；部署到 Cloudflare 后自动启用 HTTPS。
+安全机制：登录返回 HMAC-SHA256 签名 token（7 天过期），无固定密钥硬编码；密码存数据库为 SHA-256 加盐哈希（不存明文），设置接口不下发任何密钥类字段；同一 IP 连续 5 次密码错误锁定 15 分钟；所有数据接口均需登录鉴权；部署到 Cloudflare 后自动启用 HTTPS。未登录访问时页面整体遮盖，不泄露任何数据与配置。
 
 ## 两步验证（2FA，可选）
 
@@ -142,6 +145,14 @@ card-ledger/
 ```
 
 ## 发布记录
+
+### v1.1.0（2026-10-04）
+
+- **新增 Bark 推送**：iOS 推送通道，设备 Key 在设置页填写保存即可（无需部署配置），启用后定时提醒改走 Bark
+- **新增设置页自助修改密码**：登录后可在「账号安全」修改登录密码（校验当前密码，密码以 SHA-256 加盐哈希存数据库，不存明文）
+- **未登录数据遮盖**：未登录访问时页面整体遮盖并提示登录，设置页等敏感内容不再暴露；设置接口不下发密码哈希 / 2FA 密钥等敏感字段
+- 修复：保存设置时推送开关（PushPlus / Bark / 邮件）真正生效（此前仅前端切换未落库）
+- 演示站同步：模拟密码修改流程，隐藏部署细节说明
 
 ### v1.0.0（第一版上线 · 2026-10-03）
 

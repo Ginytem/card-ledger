@@ -178,6 +178,7 @@ mock = r'''
     }
     if(p==='/api/cards/import'&&m==='POST'){ return j({success:true,inserted:0,skipped:0,errors:['演示环境：批量导入请在正式版使用']}); }
     if(p==='/api/test-push'&&m==='POST'){ return j({ok:true,message:'演示环境：无需真实推送'}); }
+    if(p==='/api/password'&&m==='POST'){ return j({success:true,message:'演示环境：密码修改已模拟'}); }
     return j({success:false,message:'Not Found'},404);
   }
 
@@ -193,6 +194,15 @@ mock = r'''
     document.title='卡账记 · 演示站';
     var sub=document.querySelector('.header .sub');
     if(sub) sub.textContent='演示站 · 数据仅存本浏览器';
+    // 演示站隐藏部署与配置说明（避免暴露部署细节），改为一行提示
+    var dep=document.getElementById('deploy-info');
+    if(dep){
+      var note=document.createElement('div');
+      note.style.cssText='font-size:11.5px;color:var(--sub);line-height:1.7;padding:10px 0';
+      note.textContent='本页为在线演示：免登录、数据仅保存在当前浏览器。正式部署步骤、密码与推送渠道配置说明见 GitHub 仓库 README。';
+      dep.parentNode.insertBefore(note, dep.nextSibling);
+      dep.style.display='none';
+    }
     var pill=document.createElement('span');
     pill.textContent='演示';
     pill.style.cssText='font-size:10px;font-weight:800;color:#fff;background:linear-gradient(135deg,#10b981,#059669);border-radius:99px;padding:2px 8px;margin-left:8px;letter-spacing:0.5px';
