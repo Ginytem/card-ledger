@@ -553,6 +553,7 @@ input[type=number]{-moz-appearance:textfield}
     <div class="section">
       <div class="section-title">提醒设置</div>
       <div class="form-card">
+        <div id="ch-status" style="margin-bottom:14px"></div>
         <label class="f-label">还款提醒提前天数（0 = 当天，1 = 提前1天…）</label>
         <input class="f-input" id="set-advance" type="number" min="0" max="30" value="1">
         <label class="f-label" style="margin-top:14px">推送渠道</label>
@@ -561,10 +562,21 @@ input[type=number]{-moz-appearance:textfield}
           <button class="btn ghost" id="set-bark" style="flex:1">Bark</button>
           <button class="btn ghost" id="set-email" style="flex:1">邮件提醒</button>
         </div>
+        <div id="pp-config" class="hidden" style="margin-top:12px">
+          <label class="f-label">PushPlus Token</label>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="f-input" id="set-pp-token" type="password" placeholder="pushplus.plus 注册后复制的 token" style="flex:1" autocomplete="off">
+            <button class="btn ghost" id="pp-token-eye" type="button" style="flex:0 0 auto;padding:8px 10px" onclick="toggleSecret('set-pp-token',this)">显示</button>
+          </div>
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">Token 保存后隐藏显示，点「显示」可查看/修改。也可部署前配置环境变量 PUSHPLUS_TOKEN 兜底。</div>
+        </div>
         <div id="bark-config" class="hidden" style="margin-top:12px">
           <label class="f-label">Bark 设备 Key</label>
-          <input class="f-input" id="set-bark-key" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..." >
-          <div style="font-size:11px;color:var(--sub);margin-top:4px">也可填自建 Bark 服务器完整地址（http(s):// 开头）。启用 Bark 后提醒改走 Bark，PushPlus 不再发送。</div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <input class="f-input" id="set-bark-key" type="password" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..." style="flex:1" autocomplete="off">
+            <button class="btn ghost" id="bark-key-eye" type="button" style="flex:0 0 auto;padding:8px 10px" onclick="toggleSecret('set-bark-key',this)">显示</button>
+          </div>
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">Key 保存后隐藏显示，点「显示」可查看/修改。也可填自建 Bark 服务器完整地址（http(s):// 开头）。启用 Bark 后提醒改走 Bark，PushPlus 不再发送。</div>
         </div>
         <div style="font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6">
           邮件提醒通过将推送接口指向邮件通道实现（见 README 特殊步骤）。<br>
@@ -817,6 +829,7 @@ async function loadAll(){
   allBills=b.success?b.bills:[];
   allFees=f.success?f.feeRules:[];
   settings=s.success?s.settings:{};
+  window.envState=s.success?(s.env_state||{}):{};
   renderDash();
   updateAuth();
 }
@@ -1122,6 +1135,29 @@ function renderBills(){
 }
 
 // ---------- 设置页 ----------
+function toggleSecret(id, btn){
+  const el=document.getElementById(id);
+  if(!el) return;
+  const show=el.type==='password';
+  el.type=show?'text':'password';
+  if(btn) btn.textContent=show?'隐藏':'显示';
+}
+function renderChannelStatus(p,b,e){
+  const box=$('ch-status');
+  if(!box) return;
+  const es=window.envState||{};
+  const ppCfg=!!(settings.pushplus_token&&settings.pushplus_token.trim())||!!es.pushplus_token;
+  const bkCfg=!!(settings.bark_key&&settings.bark_key.trim());
+  const mailCfg=!!es.custom_api;
+  const dot=(on,cfg)=>'<span style="width:8px;height:8px;border-radius:50%;display:inline-block;background:'+(on?(cfg?'var(--green)':'var(--yellow)'):'var(--gray)')+'"></span>';
+  const tag=(on,cfg)=>{ if(!on) return '<span style="font-size:11px;color:var(--sub)">未启用</span>'; return '<span style="font-size:11px;font-weight:600;color:'+(cfg?'var(--green)':'var(--yellow)')+'">'+(cfg?'已启用 · 已配置':'已启用 · 缺配置')+'</span>'; };
+  const row=(name,on,cfg,hint)=>'<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:var(--card);margin-bottom:6px">'+dot(on,cfg)+'<span style="font-size:12px;color:var(--txt);flex:1">'+name+'</span>'+tag(on,cfg)+'<span style="font-size:10.5px;color:var(--muted)">'+hint+'</span></div>';
+  box.innerHTML=
+    '<div style="font-size:11px;color:var(--sub);margin-bottom:6px">提醒渠道状态</div>'+
+    row('PushPlus 微信',p,ppCfg,ppCfg?'':'环境变量未配')+
+    row('Bark（iOS）',b,bkCfg,bkCfg?'':'需在下方填 Key')+
+    row('邮件提醒',e,mailCfg,mailCfg?'':'需部署配置接口');
+}
 function renderSettings(){
   $('set-advance').value=settings.payment_advance_days||'1';
   const p=settings.enable_pushplus!=='0', b=settings.enable_bark==='1', e=settings.enable_email==='1';
@@ -1134,7 +1170,14 @@ function renderSettings(){
   eb.style.color=e?'#34d399':'var(--sub)';
   const bk=$('bark-config');
   if(bk) bk.classList.toggle('hidden',!b);
+  const pc=$('pp-config');
+  if(pc) pc.classList.toggle('hidden',!p);
+  // 密钥回填后统一隐性显示
+  ['set-bark-key','set-pp-token'].forEach(id=>{ const el=$(id); if(el) el.type='password'; });
+  ['bark-key-eye','pp-token-eye'].forEach(id=>{ const el=$(id); if(el) el.textContent='显示'; });
   if($('set-bark-key')) $('set-bark-key').value=settings.bark_key||'';
+  if($('set-pp-token')) $('set-pp-token').value=settings.pushplus_token||'';
+  renderChannelStatus(p,b,e);
   if($('sec-user')) $('sec-user').textContent=adminUsername||'-';
   loadTotpState();
 }
@@ -1369,6 +1412,7 @@ async function saveSettings(){
   body.enable_bark=settings.enable_bark==='1'?'1':'0';
   body.enable_email=settings.enable_email==='1'?'1':'0';
   body.bark_key=($('set-bark-key')?$('set-bark-key').value.trim():'');
+  body.pushplus_token=($('set-pp-token')?$('set-pp-token').value.trim():'');
   const r=await api('/api/settings','PUT',body);
   if(r.success){ toast('设置已保存'); await loadAll(); }
 }

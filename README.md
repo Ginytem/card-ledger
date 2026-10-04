@@ -61,7 +61,7 @@ wrangler d1 execute card-ledger-db --remote --file=./d1/init.sql
 # 4. 设置敏感配置（推荐用 Secret，加密存储、不进仓库）
 wrangler secret put PASSWORD      # 你的登录密码（≥8 位，别用 admin123）；登录后可在设置页「账号安全」自助修改，无需再碰命令行
 wrangler secret put TOKEN_SECRET  # 随机密钥：openssl rand -hex 32
-wrangler secret put PUSHPLUS_TOKEN # PushPlus token（pushplus.plus 注册，不配置则 PushPlus 微信提醒不可用；也可改用 Bark，见下）
+wrangler secret put PUSHPLUS_TOKEN # 可选：PushPlus token（也可直接在设置页「提醒设置」填写保存，二选一即可；不配置则 PushPlus 微信提醒不可用，可改用 Bark）
 # 然后将 wrangler.toml [vars] 中对应的 PASSWORD / TOKEN_SECRET / PUSHPLUS_TOKEN 三项删除，
 # 只保留 USERNAME 与 PUSHPLUS_API（非敏感项可留在 vars）
 
@@ -89,7 +89,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 - 设置页 → 推送渠道 → 启用 PushPlus 或 Bark 并保存 → 发送测试提醒，能收到消息即推送通道正常
 - 启用两步验证（可选，推荐）
 
-> **推送渠道二选一**：启用 Bark 后提醒改走 Bark（设备 Key 填设置页即可，无需部署配置）；未启用 Bark 时走 PushPlus（需配置 PUSHPLUS_TOKEN）。
+> **推送渠道二选一**：启用 Bark 后提醒改走 Bark（设备 Key 填设置页即可，无需部署配置）；未启用 Bark 时走 PushPlus（Token 可在设置页填写保存，或部署前配置 PUSHPLUS_TOKEN）。设置页顶部「提醒渠道状态」可查看各渠道当前是否已启用、已配置。
 
 ## 配置说明
 
@@ -97,7 +97,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 |---|---|
 | USERNAME / PASSWORD | 管理员登录账号 / 密码。PASSWORD 推荐用 Secret 设置；登录后可在设置页「账号安全」自助修改 |
 | TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置；同时用作密码哈希盐 |
-| PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），用 Secret 设置 |
+| PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），可选：设置页填写保存即可，也可用 Secret 配置 |
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
 | bark_key（设置页） | Bark 设备 Key（iPhone 安装 Bark 后复制），在设置页「提醒设置」填写并保存，存于数据库，无需部署配置 |
 
