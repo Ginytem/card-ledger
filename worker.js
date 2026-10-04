@@ -1311,6 +1311,10 @@ body{background:var(--bg);color:var(--txt);font-family:-apple-system,BlinkMacSys
 .kpi.wide{grid-column:span 2}
 .section{padding:10px 16px 0}
 .section-title{font-size:14px;font-weight:800;color:var(--txt);margin:14px 2px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;letter-spacing:0.2px}
+.fold-title{cursor:pointer;user-select:none}
+.fold-sum{font-size:11px;color:var(--sub);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%}
+.fold-arrow{font-size:12px;color:var(--sub);transition:transform .2s;flex:none}
+.collapsed .fold-arrow{transform:rotate(-90deg)}
 .section-title::before{content:'';width:4px;height:14px;border-radius:2px;background:linear-gradient(180deg,var(--blue),var(--green));margin-right:7px;flex:none}
 .cal-toggle-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);cursor:pointer;font-size:14.5px;font-weight:800;color:var(--txt);margin:14px 0 10px;transition:background .15s}
 .cal-toggle-bar:hover{background:var(--card2)}
@@ -1613,8 +1617,12 @@ input[type=number]{-moz-appearance:textfield}
   <!-- ===== 设置 ===== -->
   <div id="page-settings" class="hidden">
     <div class="section">
-      <div class="section-title">提醒设置</div>
-      <div class="form-card">
+      <div class="section-title fold-title collapsed" onclick="toggleFold(this)">
+        <span>提醒设置</span>
+        <span class="fold-sum" id="fold-sum-remind"></span>
+        <span class="fold-arrow">▾</span>
+      </div>
+      <div class="form-card fold-body hidden">
         <div id="ch-status" style="margin-bottom:14px"></div>
         <label class="f-label">还款提醒提前天数（0 = 当天，1 = 提前1天…）</label>
         <input class="f-input" id="set-advance" type="number" min="0" max="30" value="1">
@@ -1630,7 +1638,7 @@ input[type=number]{-moz-appearance:textfield}
             <input class="f-input" id="set-pp-token" type="password" placeholder="pushplus.plus 注册后复制的 token" style="flex:1" autocomplete="off">
             <button class="btn ghost" id="pp-token-eye" type="button" style="flex:0 0 auto;padding:8px 10px" onclick="toggleSecret('set-pp-token',this)">显示</button>
           </div>
-          <div style="font-size:11px;color:var(--sub);margin-top:4px">Token 保存后隐藏显示，点「显示」可查看/修改。也可部署前配置环境变量 PUSHPLUS_TOKEN 兜底。</div>
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">Token 保存后隐藏显示，点「显示」可查看/修改。</div>
         </div>
         <div id="bark-config" class="hidden" style="margin-top:12px">
           <label class="f-label">Bark 设备 Key</label>
@@ -1638,12 +1646,7 @@ input[type=number]{-moz-appearance:textfield}
             <input class="f-input" id="set-bark-key" type="password" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..." style="flex:1" autocomplete="off">
             <button class="btn ghost" id="bark-key-eye" type="button" style="flex:0 0 auto;padding:8px 10px" onclick="toggleSecret('set-bark-key',this)">显示</button>
           </div>
-          <div style="font-size:11px;color:var(--sub);margin-top:4px">Key 保存后隐藏显示，点「显示」可查看/修改。也可填自建 Bark 服务器完整地址（http(s):// 开头）。启用 Bark 后提醒改走 Bark，PushPlus 不再发送。</div>
-        </div>
-        <div style="font-size:11px;color:var(--sub);margin-top:10px;line-height:1.6">
-          邮件提醒通过将推送接口指向邮件通道实现（见 README 特殊步骤）。<br>
-          提醒每日由定时任务触发，同一提醒同一天不会重复发送。<br>
-          <b style="color:var(--yellow)">本地调试不跑定时任务，可用下方按钮手动验证推送通道。</b>
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">Key 保存后隐藏显示，点「显示」可查看/修改。也可填自建 Bark 服务器完整地址（http(s):// 开头）。</div>
         </div>
         <button class="btn ghost block" id="test-push" style="margin-top:12px">发送测试提醒</button>
         <div id="test-push-result" style="font-size:11.5px;color:var(--sub);margin-top:8px"></div>
@@ -1651,8 +1654,12 @@ input[type=number]{-moz-appearance:textfield}
       </div>
     </div>
     <div class="section">
-      <div class="section-title">账号安全</div>
-      <div class="form-card">
+      <div class="section-title fold-title collapsed" onclick="toggleFold(this)">
+        <span>账号安全</span>
+        <span class="fold-sum" id="fold-sum-account">账号 -</span>
+        <span class="fold-arrow">▾</span>
+      </div>
+      <div class="form-card fold-body hidden">
         <div style="font-size:11.5px;color:var(--sub);line-height:1.7;margin-bottom:10px">
           当前账号：<b><span id="sec-user" style="color:var(--txt)">-</span></b> · 登录密码在下方功能中修改（新密码至少 6 位，修改后下次登录生效）
         </div>
@@ -1670,8 +1677,12 @@ input[type=number]{-moz-appearance:textfield}
       </div>
     </div>
     <div class="section">
-      <div class="section-title">两步验证（2FA）</div>
-      <div class="form-card">
+      <div class="section-title fold-title collapsed" onclick="toggleFold(this)">
+        <span>两步验证（2FA）</span>
+        <span class="fold-sum" id="fold-sum-totp">未启用</span>
+        <span class="fold-arrow">▾</span>
+      </div>
+      <div class="form-card fold-body hidden">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <span style="font-size:12.5px">状态：</span>
           <span id="totp-status" style="font-size:12.5px;font-weight:600">…</span>
@@ -1711,17 +1722,21 @@ input[type=number]{-moz-appearance:textfield}
       </div>
     </div>
     <div class="section" id="deploy-info">
-      <div class="section-title">部署与配置说明</div>
-      <div class="form-card" style="font-size:12px;color:var(--txt);line-height:1.9">
+      <div class="section-title fold-title collapsed" onclick="toggleFold(this)">
+        <span>部署与配置说明</span>
+        <span class="fold-sum">部署前必读</span>
+        <span class="fold-arrow">▾</span>
+      </div>
+      <div class="form-card fold-body hidden" style="font-size:12px;color:var(--txt);line-height:1.9">
         <div><b>1. 登录账号密码</b><br>
         首次部署：在 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 配置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">USERNAME</code>，并用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PASSWORD</code> 设置初始密码。登录后可在本页「账号安全」直接修改密码，无需再碰命令行。</div>
-        <div style="margin-top:8px"><b>2. 推送渠道</b><br>
-        <b>PushPlus 微信</b>：到 pushplus.plus 注册，复制 token 填入 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 的 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_TOKEN</code> 后重启。<br>
+        <div style="margin-top:8px"><b>2. 推送渠道（三选一，启用 Bark 后提醒走 Bark，PushPlus 不再发送）</b><br>
+        <b>PushPlus 微信</b>：到 pushplus.plus 注册，复制 token 在本页「提醒设置」填写保存即可；也可部署前用 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler secret put PUSHPLUS_TOKEN</code> 配置（环境变量兜底）。<br>
         <b>Bark（iOS）</b>：iPhone 安装 Bark，复制设备 Key 填到本页「提醒设置」，启用 Bark 后提醒直接走 Bark（无需部署配置）。<br>
         <b>邮件</b>：将 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">PUSHPLUS_API</code> 改为邮件/通知接口地址（支持 JSON：token, title, content）。</div>
         <div style="margin-top:8px"><b>3. 每日自动提醒（上线后）</b><br>
-        <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 内置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">[triggers] crons = ["0 1 * * *"]</code>（北京时间每天 9 点），deploy 时自动创建。还款提醒提前天数、年费提前 60 天提醒每天检查，同一提醒不重复发送。<br>
-        本地调试不跑定时任务，用上方「发送测试提醒」验证通道。</div>
+        <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">wrangler.toml</code> 内置 <code style="font-family:ui-monospace,monospace;font-size:11px;background:var(--bar-bg);padding:1px 5px;border-radius:4px">[triggers] crons = ["0 1 * * *"]</code>（北京时间每天 9 点），deploy 时自动创建。还款提醒提前天数、年费提前 60 天提醒每天检查，同一提醒同一天不重复发送。<br>
+        本地调试不跑定时任务，用「提醒设置」里的「发送测试提醒」按钮手动验证推送通道。</div>
         <div style="margin-top:8px"><b>4. 数据备份</b><br>
         「数据」页可导出 JSON / CSV 备份，防止数据丢失。</div>
       </div>
@@ -2197,6 +2212,13 @@ function renderBills(){
 }
 
 // ---------- 设置页 ----------
+function toggleFold(titleEl){
+  const body=titleEl.parentElement.querySelector('.fold-body');
+  if(!body) return;
+  const collapsed=!body.classList.contains('hidden');
+  body.classList.toggle('hidden',collapsed);
+  titleEl.classList.toggle('collapsed',collapsed);
+}
 function toggleSecret(id, btn){
   const el=document.getElementById(id);
   if(!el) return;
@@ -2219,6 +2241,13 @@ function renderChannelStatus(p,b,e){
     row('PushPlus 微信',p,ppCfg,ppCfg?'':'环境变量未配')+
     row('Bark（iOS）',b,bkCfg,bkCfg?'':'需在下方填 Key')+
     row('邮件提醒',e,mailCfg,mailCfg?'':'需部署配置接口');
+  // 折叠摘要：只显示已启用的渠道（全部未启用则提示）
+  const onRows=[];
+  if(p) onRows.push('PushPlus'+(ppCfg?' 已配置':' 缺配置'));
+  if(b) onRows.push('Bark'+(bkCfg?' 已配置':' 缺配置'));
+  if(e) onRows.push('邮件'+(mailCfg?' 已配置':' 缺配置'));
+  const sum=$('fold-sum-remind');
+  if(sum) sum.textContent=onRows.length?onRows.join(' · '):'未启用任何渠道';
 }
 function renderSettings(){
   $('set-advance').value=settings.payment_advance_days||'1';
@@ -2241,6 +2270,8 @@ function renderSettings(){
   if($('set-pp-token')) $('set-pp-token').value=settings.pushplus_token||'';
   renderChannelStatus(p,b,e);
   if($('sec-user')) $('sec-user').textContent=adminUsername||'-';
+  const fas=$('fold-sum-account');
+  if(fas) fas.textContent='账号 '+(adminUsername||'-');
   loadTotpState();
 }
 
@@ -2249,9 +2280,10 @@ let totpState={enabled:false};
 async function loadTotpState(){
   try{ const r=await api('/api/totp/status','GET'); totpState.enabled=!!r.enabled; }catch(e){}
   const st=$('totp-status');
+  const fs=$('fold-sum-totp');
   if(st){
-    if(totpState.enabled){ st.textContent='已启用'; st.style.color='var(--green)'; }
-    else { st.textContent='未启用'; st.style.color='var(--sub)'; }
+    if(totpState.enabled){ st.textContent='已启用'; st.style.color='var(--green)'; if(fs) fs.textContent='已启用'; }
+    else { st.textContent='未启用'; st.style.color='var(--sub)'; if(fs) fs.textContent='未启用'; }
     $('totp-setup').classList.toggle('hidden',totpState.enabled);
     $('totp-active').classList.toggle('hidden',!totpState.enabled);
   }
