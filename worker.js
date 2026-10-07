@@ -1020,10 +1020,28 @@ async function importCards(env, csvText) {
 }
 
 // 测试提醒通道（本地即可验证，不依赖定时任务；按设置渠道路由：Bark → PushPlus）
+function normalizeBarkUrl(key) {
+  // 兼容三种填法：
+  // 1) 纯设备 Key：JzBxxxxxxxxx
+  // 2) 完整链接（Bark 复制的模板）：https://api.day.app/KEY/标题/内容?icon=xxx
+  // 3) 标准 API 地址：https://api.day.app/KEY
+  // 统一归一为 https://api.day.app/<设备Key>?<原查询参数>，再以 JSON body 发送真实标题/内容
+  if (/^https?:\/\//i.test(key)) {
+    try {
+      const u = new URL(key);
+      const parts = u.pathname.split('/').filter(Boolean);
+      if (parts.length >= 1) {
+        return u.origin + '/' + parts[0] + (u.search || '');
+      }
+    } catch (e) {}
+    return key;
+  }
+  return 'https://api.day.app/' + key;
+}
 async function sendBark(env, title, body) {
   const key = await getSetting(env, 'bark_key', '').catch(() => '');
   if (!key) return { ok: false, message: '未配置 Bark 设备 Key（设置页填写后保存）' };
-  const url = /^https?:\/\//i.test(key) ? key : ('https://api.day.app/' + key);
+  const url = normalizeBarkUrl(key);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   try {
@@ -1664,7 +1682,7 @@ input[type=number]{-moz-appearance:textfield}
             <input class="f-input" id="set-bark-key" type="password" placeholder="iPhone 安装 Bark 后复制的 Key，如 i3nDk..." style="flex:1" autocomplete="off">
             <button class="btn ghost" id="bark-key-eye" type="button" style="flex:0 0 auto;padding:8px 10px" onclick="toggleSecret('set-bark-key',this)">显示</button>
           </div>
-          <div style="font-size:11px;color:var(--sub);margin-top:4px">Key 保存后隐藏显示，点「显示」可查看/修改。也可填自建 Bark 服务器完整地址（http(s):// 开头）。</div>
+          <div style="font-size:11px;color:var(--sub);margin-top:4px">Key 保存后隐藏显示，点「显示」可查看/修改。支持纯设备 Key（如 i3nDk...）或 Bark App 复制的完整链接（含「标题/内容」占位符与自定义图标参数），自动归一化后发送。</div>
         </div>
         <button class="btn ghost block" id="test-push" style="margin-top:12px">发送测试提醒</button>
         <div id="test-push-result" style="font-size:11.5px;color:var(--sub);margin-top:8px"></div>

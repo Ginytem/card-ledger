@@ -103,7 +103,7 @@ crons = ["0 1 * * *"]   # 每天 UTC 01:00 = 北京时间 09:00
 | TOKEN_SECRET | 登录 token 签名密钥，**上线前必改为随机长字符串**（`openssl rand -hex 32`），用 Secret 设置；同时用作密码哈希盐 |
 | PUSHPLUS_TOKEN | PushPlus 微信推送 token（pushplus.plus 注册获取），可选：设置页填写保存即可，也可用 Secret 配置 |
 | PUSHPLUS_API | 推送接口地址，默认 PushPlus；可改为兼容 JSON（token, title, content）的邮件 / 通知接口 |
-| bark_key（设置页） | Bark 设备 Key（iPhone 安装 Bark 后复制），在设置页「提醒设置」填写并保存，存于数据库，无需部署配置 |
+| bark_key（设置页） | Bark 设备 Key（iPhone 安装 Bark 后复制；也可粘贴 Bark App 复制的完整链接，含「标题/内容」占位符与图标参数，系统自动归一化），在设置页「提醒设置」填写并保存，存于数据库，无需部署配置 |
 
 > 上表中仅 `TOKEN_SECRET` 与 `PUSHPLUS_API` 需部署前配置（无法在设置页修改）；`USERNAME`、`PASSWORD`、`PUSHPLUS_TOKEN`、`bark_key` 均可部署后登录设置页自助修改或填写。
 
