@@ -1048,7 +1048,7 @@ async function sendBark(env, title, body) {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body }),
+      body: JSON.stringify({ title, body, group: '卡账记' }),
       signal: controller.signal,
     });
     // 推送已发出即算成功，不再等待响应正文（部分 Bark 网关连接不关闭会导致正文读取挂起）
